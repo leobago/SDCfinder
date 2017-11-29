@@ -1,0 +1,37 @@
+#default image (docker best practices advice against using :latest tags, be advised)
+image: gcc:7
+
+stages:
+  - build
+
+.job_template: &job_tdef
+  stage: build
+  before_script:
+    - apt update
+    - apt install -y --no-install-recommends cmake
+  script:
+    - mkdir build
+    - cd build
+    - cmake ../C
+    - make
+    - make install
+  tags:
+    - cpu
+  dependencies: []
+    
+    
+sdc_build:gcc-7:
+  image: gcc:7
+  <<: *job_tdef
+
+sdc_build:gcc-6:
+  image: gcc:6
+  <<: *job_tdef
+  
+sdc_build:gcc-5:
+  image: gcc:5
+  <<: *job_tdef
+  
+sdc_build:gcc-4:
+  image: gcc:4
+  <<: *job_tdef
