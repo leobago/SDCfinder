@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 3.0)
 project (MemoryReliability)
 option(ENABLE_ERROR_INJECTION "Inject randomly errors in allocated memory region" OFF)
 if(ENABLE_ERROR_INJECTION)
