@@ -4,7 +4,7 @@
  * Implements address translation from virtual to physical.
  */
 
-#include "../include/addresstranslation.h"
+#include "addresstranslation.h"
 
 
 #define PAGEMAP_ENTRY 8

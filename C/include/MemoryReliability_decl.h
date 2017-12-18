@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <time.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -42,14 +43,18 @@ unsigned int NumErrors;// = 0;
 
 char HostName[255];
 
-unsigned long long NumBytes;// = 0;
-void* Mem;// = NULL;
+unsigned long long NumBytesCPU;// = 0;
+unsigned long long NumBytesGPU;// = 0;
+void* cpu_mem;// = NULL;
+void* gpu_mem;// = NULL;
 unsigned char mem_pattern;
 
 unsigned int SleepTime;// = 0;
-unsigned char ExitNow;// = 0;
-unsigned char IsDaemonStart;// = 0;
-unsigned char IsDaemonStop;// = 0;
+bool ExitNow;// = 0;
+bool IsDaemonStart;// = 0;
+bool IsDaemonStop;// = 0;
+bool CheckCPU;
+bool CheckGPU;
 
 // FUNCTIONS
 void log_error(void* address, ADDRVALUE actual_value, ADDRVALUE expected_value);
@@ -57,14 +62,21 @@ void log_message(char* message);
 void warn_for_errors();
 void log_local_mem_errors(int local_mem_errors); // Logs local memory errors
 
-void simple_memory_test(void* buffer, unsigned int num_bytes);
-void zero_one_test(void* buffer, unsigned int num_bytes);
-void random_pattern_test(void* buffer, unsigned int num_bytes);
+typedef enum Strategy {
+    SIMPLE = 0,
+    ZERO = 1,
+    RANDOM = 2
+} Strategy_t;
 
-unsigned char parse_arguments(int argc, char* argv[]);
-void print_usage();
+void memory_test_loop(Strategy_t type);
+
+bool parse_arguments(int argc, char* argv[]);
+void print_usage(char* program_name);
 void check_no_daemon_running();
-void initialize_memory();
+void initialize_cpu_memory();
+void initialize_gpu_memory();
+void free_cpu_memory();
+void free_gpu_memory();
 void start_daemon();
 void stop_daemon();
 void start_client();

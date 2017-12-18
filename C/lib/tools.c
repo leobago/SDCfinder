@@ -1,16 +1,87 @@
-#include "../include/MemoryReliability_decl.h"
+#include <stdbool.h>
+#ifdef USE_CUDA
+#include <cuda_runtime.h>
+#include "MemoryReliability_decl.cuh"
+#endif
+#include "MemoryReliability_decl.h"
 
-void simple_memory_test(void* mem, unsigned int num_bytes)
+void inject_cpu_error(unsigned char* start, ADDRVALUE expected_value, Strategy_t s)
 {
-	unsigned int i = 1;
-	unsigned int word_ind = 0;
+#ifdef INJECT_ERR
+    if (s != SIMPLE)
+    {
+        int riter = rand()%10 + 1;
+        if (riter == 5) {
+            unsigned int ruibytes;
+            int ribytes = rand();
+            memcpy(&ruibytes, &ribytes, sizeof(ribytes));
+            ruibytes = (ruibytes%NumBytesCPU);
+            unsigned char *ptr_data = start + ruibytes;
+            if (s == ZERO) {
+                memset(ptr_data, 0x1, 1);
+            }
+            uintptr_t ptrmask = sizeof(uintptr_t)-1;
+            ptr_data = (unsigned char*) ((uintptr_t)ptr_data & ~ptrmask);
+            if (s == RANDOM) {
+                *ptr_data = ~expected_value;
+            }
+            char msg[1000];
+            snprintf(msg,1000,"Inject error at %p (CPU)", ptr_data);
+            log_message(msg);
+        }
+    }
+#endif
+}
 
-	ADDRVALUE expected_value;
-	ADDRVALUE* actual_value;
-	unsigned char int_size = sizeof(ADDRVALUE);
-	unsigned int num_words = num_bytes / int_size;
-	ADDRVALUE* buffer = NULL;
+void inject_gpu_error(unsigned char* start, ADDRVALUE expected_value, Strategy_t s)
+{
+#ifdef INJECT_ERR
+    if (s != SIMPLE)
+    {
+        int riter = rand()%10 + 1;
+        if (riter == 5) {
+            unsigned int ruibytes;
+            int ribytes = rand();
+            memcpy(&ruibytes, &ribytes, sizeof(ribytes));
+            ruibytes = (ruibytes%NumBytesCPU);
+            unsigned char* ptr_data = start + ruibytes;
+            if (s == ZERO) {
+                cudaMemset(ptr_data, 0x1, 1);
+            }
+            uintptr_t ptrmask = sizeof(uintptr_t)-1;
+            ptr_data = (unsigned char*) ((uintptr_t)ptr_data & ~ptrmask);
+            ADDRVALUE new_value = ~expected_value;
+            if (s == RANDOM) {
+                cudaMemcpy(ptr_data, &new_value, sizeof(ADDRVALUE), cudaMemcpyHostToDevice);
+            }
+            char msg[1000];
+            snprintf(msg,1000,"Inject error at %p (GPU)", ptr_data);
+            log_message(msg);
+        }
+    }
+#endif
+}
 
+bool check_cpu_mem(ADDRVALUE* buffer,
+                   unsigned long long num_bytes,
+                   ADDRVALUE expected_value,
+                   ADDRVALUE new_value)
+{
+    const long unsigned num_words = num_bytes / sizeof(ADDRVALUE);
+    for (long unsigned word = 0; word < num_words; word++)
+    {
+        ADDRVALUE actual_value = buffer[word];
+        if (actual_value != expected_value)
+        {
+            log_error(&buffer[word], actual_value, expected_value);
+        }
+
+        buffer[word] = new_value;
+    }
+}
+
+void simple_memory_test()
+{
 	//
 	// Start the HW counters for the LocalMemErrors
 	//
@@ -26,27 +97,17 @@ void simple_memory_test(void* mem, unsigned int num_bytes)
 		}
 	}
 
+    ADDRVALUE expected_value = 0;
+
 	//
 	// The main loop
 	//
 	while(ExitNow == 0)
 	{
-		buffer = (ADDRVALUE*)mem;
-		expected_value = i - 1;
+        check_cpu_mem(cpu_mem, NumBytesCPU, expected_value, expected_value+1);
+        check_gpu_mem(gpu_mem, NumBytesGPU, expected_value, expected_value+1);
 
-		for (word_ind = 0; word_ind < num_words; word_ind++)
-		{
-			actual_value = buffer;
-			if (*actual_value != expected_value)
-			{
-				log_error(actual_value, *actual_value, expected_value);
-			}
-			*actual_value = i;
-
-			buffer++;
-		}
-
-		i++;
+        expected_value++;
 
 		local_mem_errors = readLocalMemErrorsCounters();
 		log_local_mem_errors(local_mem_errors);
@@ -57,19 +118,12 @@ void simple_memory_test(void* mem, unsigned int num_bytes)
 		}
 	}
 
-	free(mem);
-
 	local_mem_errors = stopLocalMemErrorsCounters();
 	log_local_mem_errors(local_mem_errors);
 }
 
-void zero_one_test(void* mem, unsigned int num_bytes)
+void zero_one_test()
 {
-    ADDRVALUE expected_value = 0x0;
-    ADDRVALUE* word_ind = NULL;
-    unsigned char* startMem = (unsigned char*)mem;
-    unsigned char* endMem = startMem + num_bytes;
-
     //
     // Start the HW counters for the LocalMemErrors
     //
@@ -85,40 +139,20 @@ void zero_one_test(void* mem, unsigned int num_bytes)
         }
     }
 
+    ADDRVALUE expected_value = 0x0;
     //
     // The main loop
     //
     while(ExitNow == 0)
     {
-    
-    // 
-    // Simulate error at random position and random iteration.
-    //
-#ifdef INJECT_ERR
-        int riter = rand()%10 + 1;
-        if (riter == 5) {
-            unsigned int ruibytes;
-            int ribytes = rand();
-            memcpy(&ruibytes, &ribytes, sizeof(ribytes));
-            ruibytes = (ruibytes%num_bytes);
-            unsigned char *ptr_data = startMem + ruibytes;
-            memset(ptr_data, 0x1, 1);
-            uintptr_t ptrmask = sizeof(uintptr_t)-1;
-            ptr_data = (unsigned char*) ((uintptr_t)ptr_data & ~ptrmask); 
-            char msg[1000];
-            snprintf(msg,1000,"Inject error at %p", ptr_data);
-            log_message(msg);
-        }
-#endif
-        
-        for (word_ind = (ADDRVALUE*)startMem; word_ind < (ADDRVALUE*)endMem; word_ind++)
-        {
-           if (*word_ind != expected_value)
-           {
-               log_error(word_ind, *word_ind, expected_value);
-           }
-           *word_ind = ~expected_value;
-        }
+        //
+        // Simulate error at random position and random iteration.
+        //
+        inject_cpu_error(cpu_mem, expected_value, ZERO);
+        inject_gpu_error(gpu_mem, expected_value, ZERO);
+
+        check_cpu_mem(cpu_mem, NumBytesCPU, expected_value, ~expected_value);
+
         expected_value = ~expected_value;
 
         local_mem_errors = readLocalMemErrorsCounters();
@@ -130,19 +164,12 @@ void zero_one_test(void* mem, unsigned int num_bytes)
         }
     }
 
-    free(mem);
-
     local_mem_errors = stopLocalMemErrorsCounters();
     log_local_mem_errors(local_mem_errors);
 }
 
-void random_pattern_test(void* mem, unsigned int num_bytes)
+void random_pattern_test()
 {
-    ADDRVALUE expected_value;
-    ADDRVALUE* word_ind = NULL;
-    unsigned char* startMem = (unsigned char*)mem;
-    unsigned char* endMem = startMem + num_bytes;
-
     //
     // Start the HW counters for the LocalMemErrors
     //
@@ -158,42 +185,24 @@ void random_pattern_test(void* mem, unsigned int num_bytes)
         //}
     }
 
+    ADDRVALUE expected_value;
     memset(&expected_value, mem_pattern, sizeof(uint64_t));
-    memset(mem, mem_pattern, num_bytes);
+    memset(cpu_mem, mem_pattern, NumBytesCPU);
     
     //
     // The main loop
     //
-    while(ExitNow == 0)
+    while (ExitNow == 0)
     {
         // 
         // Simulate error at random position and random iteration.
         //
-#ifdef INJECT_ERR
-        int riter = rand()%10 + 1;
-        if (riter == 5) {
-            unsigned int ruibytes;
-            int ribytes = rand();
-            memcpy(&ruibytes, &ribytes, sizeof(ribytes));
-            ruibytes = (ruibytes%num_bytes);
-            unsigned char *ptr_data = startMem + ruibytes;
-            uintptr_t ptrmask = sizeof(uintptr_t)-1;
-            ptr_data = (unsigned char*) ((uintptr_t)ptr_data & ~ptrmask); 
-            *ptr_data = ~expected_value;
-            char msg[1000];
-            snprintf(msg,1000,"Inject error at %p", ptr_data);
-            log_message(msg);
-        }
-#endif
-        
-        for (word_ind = (ADDRVALUE*)startMem; word_ind < (ADDRVALUE*)endMem; word_ind++)
-        {
-           if (*word_ind != expected_value)
-           {
-               log_error(word_ind, *word_ind, expected_value);
-           }
-           *word_ind = ~expected_value;
-        }
+        inject_cpu_error(cpu_mem, expected_value, RANDOM);
+        inject_gpu_error(gpu_mem, expected_value, RANDOM);
+
+        check_cpu_mem(cpu_mem, NumBytesCPU, expected_value, ~expected_value);
+        check_gpu_mem(gpu_mem, NumBytesGPU, expected_value, ~expected_value);
+
         expected_value = ~expected_value;
 
         local_mem_errors = readLocalMemErrorsCounters();
@@ -205,11 +214,21 @@ void random_pattern_test(void* mem, unsigned int num_bytes)
         }
     }
 
-    free(mem);
-
     local_mem_errors = stopLocalMemErrorsCounters();
     log_local_mem_errors(local_mem_errors);
 }
+
+void memory_test_loop(Strategy_t type)
+{
+    if (type == SIMPLE) {
+        simple_memory_test();
+    } else if (type == ZERO) {
+        zero_one_test();
+    } else if (type == RANDOM) {
+        random_pattern_test();
+    }
+}
+
 void check_no_daemon_running()
 {
 	pid_t pid = daemon_pid_read_from_file();
@@ -219,30 +238,99 @@ void check_no_daemon_running()
 		exit(EXIT_FAILURE);
 	}
 }
-void initialize_memory()
-{
-	while(!Mem && NumBytes > MEGA)
-	{
-		Mem = malloc(NumBytes);
-		if (!Mem)
-		{
-			NumBytes -= MEGA*10;
-		}
-	}
 
-	if (!Mem)
-	{
-		char msg[255];
-		sprintf(msg, "ERROR_INFO,Cannot allocate %llu number of bytes.", NumBytes);
-		log_message(msg);
-		sleep(2);
-		if (daemon_pid_file_exists())
-		{
-			daemon_pid_delete_file();
-		}
-		exit(EXIT_FAILURE);
-	}
-    memset(Mem, 0x0, NumBytes);
+bool is_initialized(void* ptr)
+{
+    return ptr != NULL;
+}
+
+void initialize_cpu_memory()
+{
+    if (!is_initialized(cpu_mem))
+    {
+        cpu_mem = malloc(NumBytesCPU);
+        if (cpu_mem == NULL)
+        {
+            char msg[255];
+            sprintf(msg, "ERROR_INFO,Cannot allocate %llu number of CPU memory.", NumBytesCPU);
+            log_message(msg);
+            sleep(2);
+            if (daemon_pid_file_exists())
+            {
+                daemon_pid_delete_file();
+            }
+            exit(EXIT_FAILURE);
+        }
+        memset(cpu_mem, 0x0, NumBytesCPU);
+    }
+}
+
+void initialize_gpu_memory()
+{
+#ifdef USE_CUDA
+    if (!is_initialized(gpu_mem))
+    {
+        cudaError_t err;
+        err = cudaMalloc(&gpu_mem, NumBytesGPU);
+        if (err != cudaSuccess)
+        {
+            char msg[255];
+            sprintf(msg, "ERROR_INFO,Cannot allocate %llu bytes of GPU memory (%s:%s).",
+                    NumBytesGPU, cudaGetErrorName(err), cudaGetErrorString(err));
+            log_message(msg);
+
+            goto fn_fatal_error;
+        }
+        err = cudaMemset(gpu_mem, 0x0, NumBytesGPU);
+        if (err != cudaSuccess)
+        {
+            char msg[255];
+            sprintf(msg, "ERROR_INFO,Cannot memset %llu bytes of GPU memory (%s:%s).",
+                    NumBytesGPU, cudaGetErrorName(err), cudaGetErrorString(err));
+            log_message(msg);
+
+            goto fn_fatal_error;
+        }
+    }
+#endif
+
+  fn_exit:
+    return;
+
+  fn_fatal_error:
+    sleep(2);
+    if (daemon_pid_file_exists())
+    {
+        daemon_pid_delete_file();
+    }
+    exit(EXIT_FAILURE);
+}
+
+void free_cpu_memory()
+{
+    free(cpu_mem);
+}
+
+void free_gpu_memory()
+{
+#ifdef USE_CUDA
+    cudaError_t err;
+    err = cudaFree(gpu_mem);
+    if (err != cudaSuccess)
+    {
+        char msg[255];
+        sprintf(msg, "ERROR_INFO,Cannot free GPU memory (%s:%s).",
+                    cudaGetErrorName(err), cudaGetErrorString(err));
+        log_message(msg);
+
+        sleep(2);
+        if (daemon_pid_file_exists())
+        {
+            daemon_pid_delete_file();
+        }
+        exit(EXIT_FAILURE);
+    }
+#endif
 }
 
 void sigterm_signal_handler(int signum)
@@ -250,6 +338,7 @@ void sigterm_signal_handler(int signum)
 	ExitNow = 1;
 	log_message("STOP,SIGTERM");
 }
+
 void sigint_signal_handler(int signum)
 {
 	ExitNow = 1;

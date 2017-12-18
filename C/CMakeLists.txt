@@ -1,12 +1,58 @@
-cmake_minimum_required (VERSION 2.6)
+# We need FindCUDA functionalities present in cmake >= 3.7
+cmake_minimum_required (VERSION 3.7)
 project (MemoryReliability)
+
 option(ENABLE_ERROR_INJECTION "Inject randomly errors in allocated memory region" OFF)
 if(ENABLE_ERROR_INJECTION)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DINJECT_ERR")
 endif()
-add_executable(MemoryReliability MemoryReliability.c)
-include_directories("${CMAKE_SOURCE_DIR}/include")
-set(MRLIB_SRC ${CMAKE_SOURCE_DIR}/lib/addresstranslation.c ${CMAKE_SOURCE_DIR}/lib/logging.c ${CMAKE_SOURCE_DIR}/lib/MemoryReliability_defs.c ${CMAKE_SOURCE_DIR}/lib/pmu.c ${CMAKE_SOURCE_DIR}/lib/tools.c)
+
+option(ENABLE_CUDA "Test GPU memory" ON)
+find_package(CUDA)
+if (ENABLE_CUDA AND CUDA_FOUND)
+    add_definitions(-DUSE_CUDA)
+
+    set(CUDA_PROPAGATE_HOST_FLAGS ON)
+
+    set(CUDA_NVCC_FLAGS "-std=c++11 ${CUDA_NVCC_FLAGS} -gencode arch=compute_30,code=\"sm_30,sm_35,sm_37\" -gencode arch=compute_50,code=sm_52 -gencode arch=compute_60,code=\"sm_60,sm_61\" -lineinfo")
+    set(CUDA_NVCC_FLAGS_DEBUG   "-O0 -g -G")
+    set(CUDA_NVCC_FLAGS_RELEASE "-O3       -res-usage")
+
+    message(STATUS "--------------------------------------")
+    message(STATUS "----[CUDA ENABLED] :                  ")
+    message(STATUS "---- CUDA_VERSION:      ${CUDA_VERSION} (${CUDA_VERSION_STRING})")
+    message(STATUS "---- CUDA_TOOLKIT_DIR:  ${CUDA_TOOLKIT_ROOT_DIR}")
+    message(STATUS "---- CUDA_INCLUDE_DIRS: ${CUDA_INCLUDE_DIRS}")
+    message(STATUS "---- CUDA_LIBRARIES:    ${CUDA_LIBRARIES}")
+    message(STATUS "--------                      --------")
+    message(STATUS "---- CUDA_HOST_COMPILER: ${CUDA_HOST_COMPILER}")
+    message(STATUS "--------------------------------------")
+
+elseif(ENABLE_CUDA AND NOT CUDA_FOUND)
+    message(INFO "CUDA not found")
+else()
+endif()
+
+set(MRLIB_SRC
+        ${CMAKE_CURRENT_SOURCE_DIR}/lib/addresstranslation.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/lib/logging.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/lib/MemoryReliability_defs.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/lib/pmu.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/lib/tools.c)
 add_library(MRlib STATIC ${MRLIB_SRC})
+target_include_directories(MRlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+if (ENABLE_CUDA AND CUDA_FOUND)
+    cuda_add_library(MRlib-cuda STATIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/tools.cu)
+    set_target_properties(MRlib-cuda PROPERTIES CXX_STANDARD 11)
+    target_include_directories(MRlib-cuda PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+    target_include_directories(MRlib PUBLIC ${CUDA_INCLUDE_DIRS})
+    target_link_libraries(MRlib MRlib-cuda stdc++ ${CUDA_LIBRARIES})
+endif()
+
+add_executable(MemoryReliability MemoryReliability.c)
+target_include_directories(MemoryReliability PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(MemoryReliability MRlib)
+
 install(TARGETS MemoryReliability DESTINATION ${CMAKE_INSTALL_PREFIX})
