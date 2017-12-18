@@ -17,7 +17,7 @@ stages:
   script:
     - mkdir build
     - cd build
-    - cmake ../C
+    - cmake ../C -DENABLE_ERROR_INJECTION=ON
     - make
     - make install
   tags:
@@ -27,9 +27,8 @@ stages:
     when: on_success
     expire_in: 1h
     paths:
-      - /usr/local/MemoryReliability
+      - build/MemoryReliability
   dependencies: []
-
 
 build:gcc-7:
   image: gcc:7
@@ -56,10 +55,18 @@ build:gcc-4:
 ##
 .job_test_template: &test_tdef
   stage: test
+  before_script:
+    - apt update
+    - apt install -y --no-install-recommends kmod
+    - lsmod | grep msr
+    - ls -la /dev/cpu/
+    - ls -la /usr/local
   script:
-    - /usr/local/MemoryReliability -d -m 1024 -s 10 -o output.log -e output.err
-    - sleep 120
-    - /usr/local/
+    - build/MemoryReliability -d -m 1024 -s 1 -o output.log -e output.err
+    - sleep 40
+    - build/MemoryReliability -c
+    - cat output.log
+    - cat output.err
   tags:
     - cpu
   artifacts:
