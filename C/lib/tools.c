@@ -43,16 +43,30 @@ void inject_gpu_error(unsigned char* start, ADDRVALUE expected_value, Strategy_t
             unsigned int ruibytes;
             int ribytes = rand();
             memcpy(&ruibytes, &ribytes, sizeof(ribytes));
-            ruibytes = (ruibytes%NumBytesCPU);
+            ruibytes = (ruibytes%NumBytesGPU);
             unsigned char* ptr_data = start + ruibytes;
             if (s == ZERO) {
-                cudaMemset(ptr_data, 0x1, 1);
+                cudaError_t err = cudaMemset(ptr_data, 0x1, 1);
+                if (err != cudaSuccess)
+                {
+                    char msg[255];
+                    sprintf(msg, "ERROR,Cannot memset ptr_data to 0x1 (%s:%s).",
+                            cudaGetErrorName(err), cudaGetErrorString(err));
+                    log_message(msg);
+                }
             }
             uintptr_t ptrmask = sizeof(uintptr_t)-1;
             ptr_data = (unsigned char*) ((uintptr_t)ptr_data & ~ptrmask);
             ADDRVALUE new_value = ~expected_value;
             if (s == RANDOM) {
-                cudaMemcpy(ptr_data, &new_value, sizeof(ADDRVALUE), cudaMemcpyHostToDevice);
+                cudaError_t err = cudaMemcpy(ptr_data, &new_value, sizeof(ADDRVALUE), cudaMemcpyHostToDevice);
+                if (err != cudaSuccess)
+                {
+                    char msg[255];
+                    sprintf(msg, "ERROR,Cannot memcpy ptr_data to GPU (%s:%s).",
+                            cudaGetErrorName(err), cudaGetErrorString(err));
+                    log_message(msg);
+                }
             }
             char msg[1000];
             snprintf(msg,1000,"Inject error at %p (GPU)", ptr_data);
@@ -78,6 +92,7 @@ bool check_cpu_mem(ADDRVALUE* buffer,
 
         buffer[word] = new_value;
     }
+    return true;
 }
 
 bool check_gpu_mem(ADDRVALUE* buffer,
@@ -88,6 +103,7 @@ bool check_gpu_mem(ADDRVALUE* buffer,
 #if defined(USE_CUDA)
     check_gpu_stub(buffer, num_bytes, expected_value, new_value);
 #endif
+    return true;
 }
 
 void simple_memory_test()
@@ -198,8 +214,24 @@ void random_pattern_test()
 
     ADDRVALUE expected_value;
     memset(&expected_value, mem_pattern, sizeof(uint64_t));
-    memset(cpu_mem, mem_pattern, NumBytesCPU);
-    
+    if (CheckCPU)
+    {
+        memset(cpu_mem, mem_pattern, NumBytesCPU);
+    }
+#if defined(INJECT_ERR) && defined(USE_CUDA)
+    if (CheckGPU)
+    {
+        cudaError_t err = cudaMemset(gpu_mem, mem_pattern, NumBytesGPU);
+        if (err != cudaSuccess)
+        {
+            char msg[255];
+            sprintf(msg, "ERROR,Cannot memset ptr_data to 0x1 (%s:%s).",
+                         cudaGetErrorName(err), cudaGetErrorString(err));
+            log_message(msg);
+        }
+    }
+#endif
+
     //
     // The main loop
     //
@@ -208,11 +240,15 @@ void random_pattern_test()
         // 
         // Simulate error at random position and random iteration.
         //
-        inject_cpu_error(cpu_mem, expected_value, RANDOM);
-        inject_gpu_error(gpu_mem, expected_value, RANDOM);
+        if (CheckCPU)
+            inject_cpu_error(cpu_mem, expected_value, RANDOM);
+        if (CheckGPU)
+            inject_gpu_error(gpu_mem, expected_value, RANDOM);
 
-        check_cpu_mem(cpu_mem, NumBytesCPU, expected_value, ~expected_value);
-        check_gpu_mem(gpu_mem, NumBytesGPU, expected_value, ~expected_value);
+        if (CheckCPU)
+            check_cpu_mem(cpu_mem, NumBytesCPU, expected_value, ~expected_value);
+        if (CheckGPU)
+            check_gpu_mem(gpu_mem, NumBytesGPU, expected_value, ~expected_value);
 
         expected_value = ~expected_value;
 
@@ -304,8 +340,6 @@ void initialize_gpu_memory()
         }
     }
 #endif
-
-  fn_exit:
     return;
 
   fn_fatal_error:

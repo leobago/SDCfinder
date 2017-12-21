@@ -1,4 +1,5 @@
 #include "MemoryReliability_decl.h"
+#include <errno.h>
 
 void warn_for_errors()
 {
@@ -21,6 +22,7 @@ void log_error(void* address, ADDRVALUE actual_value, ADDRVALUE expected_value)
 	FILE *f = fopen(OutFile, "a+");
 	if (!f)
 	{
+        printf("ERROR, something went wrong opening file %s!: %s\n", OutFile, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
     int field_width_value = 16;
@@ -46,6 +48,7 @@ void log_message(char* message)
 	FILE *f = fopen(OutFile, "a+");
 	if (!f)
 	{
+        printf("ERROR, something went wrong opening file %s!: %s\n", OutFile, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 	temperature = read_temperature();
