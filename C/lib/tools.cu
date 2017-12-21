@@ -24,10 +24,10 @@ void check_gpu_kernel(uintptr_t* buffer,
     }
 }
 
-void check_gpu_mem(uintptr_t* buffer,
-                   unsigned long long num_bytes,
-                   uintptr_t expected_value,
-                   uintptr_t new_value)
+void check_gpu_stub(uintptr_t* buffer,
+                    unsigned long long num_bytes,
+                    uintptr_t expected_value,
+                    uintptr_t new_value)
 {
     const long unsigned num_words = num_bytes / sizeof(uintptr_t);
     const int block_size = 128;

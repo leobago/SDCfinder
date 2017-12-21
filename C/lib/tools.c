@@ -35,7 +35,7 @@ void inject_cpu_error(unsigned char* start, ADDRVALUE expected_value, Strategy_t
 
 void inject_gpu_error(unsigned char* start, ADDRVALUE expected_value, Strategy_t s)
 {
-#ifdef INJECT_ERR
+#if defined(INJECT_ERR) && defined(USE_CUDA)
     if (s != SIMPLE)
     {
         int riter = rand()%10 + 1;
@@ -78,6 +78,16 @@ bool check_cpu_mem(ADDRVALUE* buffer,
 
         buffer[word] = new_value;
     }
+}
+
+bool check_gpu_mem(ADDRVALUE* buffer,
+                   unsigned long long num_bytes,
+                   ADDRVALUE expected_value,
+                   ADDRVALUE new_value)
+{
+#if defined(USE_CUDA)
+    check_gpu_stub(buffer, num_bytes, expected_value, new_value);
+#endif
 }
 
 void simple_memory_test()
@@ -152,6 +162,7 @@ void zero_one_test()
         inject_gpu_error(gpu_mem, expected_value, ZERO);
 
         check_cpu_mem(cpu_mem, NumBytesCPU, expected_value, ~expected_value);
+        check_gpu_mem(gpu_mem, NumBytesGPU, expected_value, ~expected_value);
 
         expected_value = ~expected_value;
 

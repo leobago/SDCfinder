@@ -7,10 +7,10 @@
 extern "C" {
 #endif
 
-void check_gpu_mem(uintptr_t* buffer,
-                   unsigned long long num_bytes,
-                   uintptr_t expected_value,
-                   uintptr_t new_value);
+void check_gpu_stub(uintptr_t* buffer,
+                    unsigned long long num_bytes,
+                    uintptr_t expected_value,
+                    uintptr_t new_value);
 
 #ifdef __cplusplus
 };
