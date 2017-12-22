@@ -49,7 +49,8 @@ endif()
 
 
 # C Standard
-set(CMAKE_C_STANDARD_REQUIRED 99)
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Compile flags
 if (("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU") OR

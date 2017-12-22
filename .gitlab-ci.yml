@@ -13,15 +13,10 @@ stages:
   stage: build
   variables:
     version: "3.7"
-    build: "0"
+    build: "2"
   before_script:
-    - wget https://cmake.org/files/v$version/cmake-$version.$build.tar.gz
-    - tar -xzvf cmake-$version.$build.tar.gz
-    - cd cmake-$version.$build/
-    - ./bootstrap
-    - make -j2
-    - sudo make install
-    - cd -
+    - wget https://cmake.org/files/v$version/cmake-$version.$build-Linux-x86_64.sh
+    - sh ./cmake-$version.$build-Linux-x86_64.sh --prefix=/usr/local --skip-license
   script:
     - mkdir build
     - cd build
@@ -42,15 +37,11 @@ stages:
   stage: build
   variables:
     version: "3.7"
-    build: "0"
+    build: "2"
   before_script:
-    - wget https://cmake.org/files/v$version/cmake-$version.$build.tar.gz
-    - tar -xzvf cmake-$version.$build.tar.gz
-    - cd cmake-$version.$build/
-    - ./bootstrap
-    - make -j2
-    - sudo make install
-    - cd -
+    - apt update && apt install -y --no-install-recommends wget ca-certificates
+    - wget https://cmake.org/files/v$version/cmake-$version.$build-Linux-x86_64.sh
+    - sh ./cmake-$version.$build-Linux-x86_64.sh --prefix=/usr/local --skip-license
   script:
     - mkdir build
     - cd build
@@ -85,11 +76,11 @@ build:gcc-4:
   <<: *build_cpu_tdef
 
 build:cuda-8:
-  image: nvidia/cuda:8.0
+  image: nvidia/cuda:8.0-devel
   <<: *build_gpu_tdef
 
 build:cuda-9:
-  image: nvidia/cuda:9.0
+  image: nvidia/cuda:9.0-devel
   <<: *build_gpu_tdef
 
 #
@@ -173,13 +164,13 @@ test:gcc-4:
     - build:gcc-4
 
 test:cuda-8:
-  image: nvidia/cuda:8
+  image: nvidia/cuda:8.0-devel
   <<: *test_gpu_tdef
   dependencies:
     - build:cuda-8
 
 test:cuda-9:
-  image: nvidia/cuda:9
+  image: nvidia/cuda:9.0-devel
   <<: *test_gpu_tdef
   dependencies:
     - build:cuda-9
