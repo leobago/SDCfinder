@@ -1,4 +1,4 @@
-# We need FindCUDA functionalities present in cmake >= 3.7
+# We need some FindCUDA features present in cmake >= 3.7
 cmake_minimum_required (VERSION 3.7)
 project (MemoryReliability)
 
@@ -102,5 +102,4 @@ endif()
 add_executable(MemoryReliability MemoryReliability.c)
 target_include_directories(MemoryReliability PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(MemoryReliability MRlib)
-
-install(TARGETS MemoryReliability DESTINATION ${CMAKE_INSTALL_PREFIX})
+install(TARGETS MemoryReliability RUNTIME DESTINATION bin)
