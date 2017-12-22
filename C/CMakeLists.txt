@@ -80,15 +80,20 @@ message(STATUS "CUDA_NVCC_FLAGS_DEBUG:          ${CUDA_NVCC_FLAGS_DEBUG}")
 message(STATUS "CUDA_NVCC_FLAGS_RELEASE:        ${CUDA_NVCC_FLAGS_RELEASE}")
 message(STATUS "----------------------------------------")
 
+add_library(addr    ${CMAKE_CURRENT_SOURCE_DIR}/lib/addresstranslation.c)
+target_include_directories(addr PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+add_library(logging ${CMAKE_CURRENT_SOURCE_DIR}/lib/logging.c)
+target_include_directories(logging PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(logging addr)
 
 set(MRLIB_SRC
-        ${CMAKE_CURRENT_SOURCE_DIR}/lib/addresstranslation.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/lib/logging.c
         ${CMAKE_CURRENT_SOURCE_DIR}/lib/MemoryReliability_defs.c
         ${CMAKE_CURRENT_SOURCE_DIR}/lib/pmu.c
         ${CMAKE_CURRENT_SOURCE_DIR}/lib/tools.c)
 add_library(MRlib STATIC ${MRLIB_SRC})
 target_include_directories(MRlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(MRlib logging)
 
 if (ENABLE_CUDA AND CUDA_FOUND)
     cuda_add_library(MRlib-cuda STATIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/tools.cu)

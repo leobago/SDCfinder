@@ -6,6 +6,8 @@
 
 #include "addresstranslation.h"
 
+#include <stdio.h>
+#include <unistd.h>
 
 #define PAGEMAP_ENTRY 8
 #define GET_BIT(X,Y) (X & ((uint64_t)1<<Y)) >> Y
