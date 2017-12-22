@@ -99,6 +99,7 @@ if (ENABLE_CUDA AND CUDA_FOUND)
     cuda_add_library(MRlib-cuda STATIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/tools.cu)
     set_target_properties(MRlib-cuda PROPERTIES CXX_STANDARD 11)
     target_include_directories(MRlib-cuda PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_link_libraries(MRlib-cuda logging)
 
     target_include_directories(MRlib PUBLIC ${CUDA_INCLUDE_DIRS})
     target_link_libraries(MRlib MRlib-cuda stdc++ ${CUDA_LIBRARIES})
