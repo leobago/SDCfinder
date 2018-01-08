@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <assert.h>
 #ifdef USE_CUDA
 #include <cuda_runtime.h>
 #include "MemoryReliability_decl.cuh"
@@ -267,12 +268,18 @@ void random_pattern_test()
 
 void memory_test_loop(Strategy_t type)
 {
-    if (type == SIMPLE) {
+    switch (type) {
+    case SIMPLE:
         simple_memory_test();
-    } else if (type == ZERO) {
+        break;
+    case ZERO:
         zero_one_test();
-    } else if (type == RANDOM) {
+        break;
+    case RANDOM:
         random_pattern_test();
+        break;
+    default:
+        assert(false);
     }
 }
 
@@ -315,19 +322,17 @@ void initialize_cpu_memory()
 void initialize_gpu_memory()
 {
 #ifdef USE_CUDA
-    if (!is_initialized(gpu_mem))
-    {
-        cudaError_t err;
-        err = cudaMalloc(&gpu_mem, NumBytesGPU);
-        if (err != cudaSuccess)
-        {
-            char msg[255];
-            sprintf(msg, "ERROR_INFO,Cannot allocate %llu bytes of GPU memory (%s:%s).",
-                    NumBytesGPU, cudaGetErrorName(err), cudaGetErrorString(err));
-            log_message(msg);
+    if (is_initialized(gpu_mem)) return;
 
-            goto fn_fatal_error;
-        }
+    cudaError_t err;
+    err = cudaMalloc(&gpu_mem, NumBytesGPU);
+    if (err != cudaSuccess)
+    {
+        char msg[255];
+        sprintf(msg, "ERROR_INFO,Cannot allocate %llu bytes of GPU memory (%s:%s).",
+                NumBytesGPU, cudaGetErrorName(err), cudaGetErrorString(err));
+        log_message(msg);
+    } else {
         err = cudaMemset(gpu_mem, 0x0, NumBytesGPU);
         if (err != cudaSuccess)
         {
@@ -335,20 +340,18 @@ void initialize_gpu_memory()
             sprintf(msg, "ERROR_INFO,Cannot memset %llu bytes of GPU memory (%s:%s).",
                     NumBytesGPU, cudaGetErrorName(err), cudaGetErrorString(err));
             log_message(msg);
-
-            goto fn_fatal_error;
         }
     }
-#endif
-    return;
 
-  fn_fatal_error:
-    sleep(2);
-    if (daemon_pid_file_exists())
-    {
-        daemon_pid_delete_file();
+    if (err != cudaSuccess) {
+        sleep(2);
+        if (daemon_pid_file_exists())
+        {
+            daemon_pid_delete_file();
+        }
+        exit(EXIT_FAILURE);
     }
-    exit(EXIT_FAILURE);
+#endif
 }
 
 void free_cpu_memory()
