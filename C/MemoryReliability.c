@@ -233,7 +233,7 @@ void print_usage(char* program_name)
     printf("Example to stop a daemon: \n");
 	printf("    %s -c\n", program_name);
 	printf("Example to run as a foreground process:\n");
-	printf("    %s --cpu -mc 1024 -s 10 -- run as a daemon, test 1024MB of memory, and sleep for 10sec.\n", program_name);
+	printf("    %s --cpu -m 1024 -s 10 -- run as a daemon, test 1024MB of memory, and sleep for 10sec.\n", program_name);
 }
 
 void start_daemon()
