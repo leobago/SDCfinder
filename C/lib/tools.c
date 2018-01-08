@@ -6,26 +6,53 @@
 #endif
 #include "MemoryReliability_decl.h"
 
+
+unsigned char* random_ptr_inside(unsigned char* start, unsigned long long size)
+{
+    unsigned int ruibytes;
+    int ribytes = rand();
+    memcpy(&ruibytes, &ribytes, sizeof(ribytes)); // TODO check if a cast would do the same
+    ruibytes = ruibytes % size;
+    return start + ruibytes;
+}
+
+unsigned char* align_to_addrvalue(unsigned char* ptr_data)
+{
+    uintptr_t ptrmask = sizeof(uintptr_t)-1;// TODO should we take the sizeof ADDRVALUE here?
+    return (unsigned char*) ((uintptr_t)ptr_data & ~ptrmask);
+}
+
+bool inject_dice_roll()
+{
+    int riter = rand()%10 + 1;
+    return riter == 5;
+}
+
 void inject_cpu_error(unsigned char* start, ADDRVALUE expected_value, Strategy_t s)
 {
 #ifdef INJECT_ERR
-    if (s != SIMPLE)
-    {
-        int riter = rand()%10 + 1;
-        if (riter == 5) {
-            unsigned int ruibytes;
-            int ribytes = rand();
-            memcpy(&ruibytes, &ribytes, sizeof(ribytes));
-            ruibytes = (ruibytes%NumBytesCPU);
-            unsigned char *ptr_data = start + ruibytes;
-            if (s == ZERO) {
-                memset(ptr_data, 0x1, 1);
-            }
-            uintptr_t ptrmask = sizeof(uintptr_t)-1;
-            ptr_data = (unsigned char*) ((uintptr_t)ptr_data & ~ptrmask);
-            if (s == RANDOM) {
-                *ptr_data = ~expected_value;
-            }
+    unsigned char *ptr_data = NULL;
+
+    if (inject_dice_roll()) { // FIXME the caller should decide to inject or not
+        switch (s) {
+        case SIMPLE:
+            break;
+        case ZERO:
+            ptr_data = random_ptr_inside(start, NumBytesCPU);
+            memset(ptr_data, 0x1, 1);
+            // TODO ask if this is correct;
+            // We write to an address and print a different one.
+            ptr_data = align_to_addrvalue(ptr_data);
+            break;
+        case RANDOM:
+            ptr_data = align_to_addrvalue(random_ptr_inside(start, NumBytesCPU));
+            *ptr_data = ~expected_value;
+            break;
+        default:
+            assert(false);
+        }
+
+        if (ptr_data != NULL) {
             char msg[1000];
             snprintf(msg,1000,"Inject error at %p (CPU)", ptr_data);
             log_message(msg);
@@ -37,38 +64,45 @@ void inject_cpu_error(unsigned char* start, ADDRVALUE expected_value, Strategy_t
 void inject_gpu_error(unsigned char* start, ADDRVALUE expected_value, Strategy_t s)
 {
 #if defined(INJECT_ERR) && defined(USE_CUDA)
-    if (s != SIMPLE)
-    {
-        int riter = rand()%10 + 1;
-        if (riter == 5) {
-            unsigned int ruibytes;
-            int ribytes = rand();
-            memcpy(&ruibytes, &ribytes, sizeof(ribytes));
-            ruibytes = (ruibytes%NumBytesGPU);
-            unsigned char* ptr_data = start + ruibytes;
-            if (s == ZERO) {
-                cudaError_t err = cudaMemset(ptr_data, 0x1, 1);
-                if (err != cudaSuccess)
-                {
-                    char msg[255];
-                    sprintf(msg, "ERROR,Cannot memset ptr_data to 0x1 (%s:%s).",
-                            cudaGetErrorName(err), cudaGetErrorString(err));
-                    log_message(msg);
-                }
+    unsigned char *ptr_data = NULL;
+    cudaError_t err;
+
+    if (inject_dice_roll()) { // FIXME the caller should decide to inject or not
+        switch (s) {
+        case SIMPLE:
+            break;
+        case ZERO:
+            ptr_data = random_ptr_inside(start, NumBytesGPU);
+            err = cudaMemset(ptr_data, 0x1, 1);
+            if (err != cudaSuccess)
+            {
+                char msg[255];
+                sprintf(msg, "ERROR,Cannot memset ptr_data to 0x1 (%s:%s).",
+                        cudaGetErrorName(err), cudaGetErrorString(err));
+                log_message(msg);
             }
-            uintptr_t ptrmask = sizeof(uintptr_t)-1;
-            ptr_data = (unsigned char*) ((uintptr_t)ptr_data & ~ptrmask);
+            // TODO ask if this is correct;
+            // We write to an address and print a different one.
+            ptr_data = align_to_addrvalue(ptr_data);
+            break;
+        case RANDOM:
+            ptr_data = align_to_addrvalue(random_ptr_inside(start, NumBytesGPU));
             ADDRVALUE new_value = ~expected_value;
-            if (s == RANDOM) {
-                cudaError_t err = cudaMemcpy(ptr_data, &new_value, sizeof(ADDRVALUE), cudaMemcpyHostToDevice);
-                if (err != cudaSuccess)
-                {
-                    char msg[255];
-                    sprintf(msg, "ERROR,Cannot memcpy ptr_data to GPU (%s:%s).",
-                            cudaGetErrorName(err), cudaGetErrorString(err));
-                    log_message(msg);
-                }
+            // TODO ask if correct; the CPU version writes one byte because dereferences a char*
+            err = cudaMemcpy(ptr_data, &new_value, 1, cudaMemcpyHostToDevice);
+            if (err != cudaSuccess)
+            {
+                char msg[255];
+                sprintf(msg, "ERROR,Cannot memcpy ptr_data to GPU (%s:%s).",
+                        cudaGetErrorName(err), cudaGetErrorString(err));
+                log_message(msg);
             }
+            break;
+        default:
+            assert(false);
+        }
+
+        if (ptr_data != NULL) {
             char msg[1000];
             snprintf(msg,1000,"Inject error at %p (GPU)", ptr_data);
             log_message(msg);
