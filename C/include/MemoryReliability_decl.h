@@ -37,8 +37,8 @@ unsigned char mem_pattern;
 
 extern unsigned int SleepTime;// = 0;
 extern bool ExitNow;// = 0;
-extern bool IsDaemonStart;// = 0;
-extern bool IsDaemonStop;// = 0;
+extern int IsDaemonStart;// = 0;
+extern int IsDaemonStop;// = 0;
 bool CheckCPU;
 bool CheckGPU;
 

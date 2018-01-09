@@ -13,7 +13,7 @@ const unsigned int GIGA                 = 1073741824;
 char PidFileName[255] = "pid.txt";
 char TemperatureFileName[] = "/sys/class/thermal/thermal_zone0/temp";
 char OutFile[255] = "MemoryReliability.log";
-char WarningFile[255] = "";
+char WarningFile[255] = "MemoryReliability.dbg";
 char ErrFile[255] = "MemoryReliability.err";
 
 unsigned int WarningRate = 0;
@@ -24,5 +24,5 @@ void* Mem = NULL;
 
 unsigned int SleepTime = 0;
 bool ExitNow = false;
-bool IsDaemonStart = false;
-bool IsDaemonStop = false;
+int IsDaemonStart = 0;
+int IsDaemonStop = 0;
