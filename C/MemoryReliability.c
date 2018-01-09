@@ -101,8 +101,13 @@ int main(int argc, char* argv[])
 
 bool parse_arguments(int argc, char* argv[])
 {
-	int i = 1, c, mSet = -1;
+	int i = 1, c;
 	unsigned int mega = 0;
+    bool mem_is_mult_8 = true;
+    bool mem_is_0 = false;
+    bool mem_is_set = false;
+    bool parse_err = false;
+    bool is_success = true;
     
     enum {
         CPU_DEV,
@@ -110,7 +115,6 @@ bool parse_arguments(int argc, char* argv[])
     };
     
     int device;
-    bool is_success = true;
     
     srand(time(NULL));
     unsigned char BinExpo = rand()%4;
@@ -150,7 +154,7 @@ bool parse_arguments(int argc, char* argv[])
                 break;
             case 'm':
                 mega = (unsigned int)atoi(optarg);
-                mSet = 1;
+                mem_is_set = true;
                 break;
             case 'o':
 			    strcpy(OutFile, optarg);
@@ -169,11 +173,11 @@ bool parse_arguments(int argc, char* argv[])
                 break;
             case ':':
                 printf("[Error] missing argument for %s!\n", opts[optsIdx].name);
-                is_success = 0;
+                parse_err = true;
                 break;
             case '?':
                 printf("[Error] Invalid option!\n");
-                is_success = 0;
+                parse_err = true;
                 break;
         }
     }
@@ -185,6 +189,7 @@ bool parse_arguments(int argc, char* argv[])
             NumBytesCPU = (unsigned long long)mega * (unsigned long long)MEGA;
             if (NumBytesCPU%8 != 0) {
                 printf("The number of Bytes has to be a multiple of 8\n");
+                mem_is_mult_8 = false;
             }
         case GPU_DEV:
             CheckGPU = true;
@@ -192,6 +197,7 @@ bool parse_arguments(int argc, char* argv[])
             NumBytesGPU = (unsigned long long)mega * (unsigned long long)MEGA;
             if (NumBytesGPU%8 != 0) {
                 printf("The number of Bytes has to be a multiple of 8\n");
+                mem_is_mult_8 = false;
             }
         default:
             CheckCPU = true;
@@ -199,27 +205,29 @@ bool parse_arguments(int argc, char* argv[])
             NumBytesCPU = (unsigned long long)mega * (unsigned long long)MEGA;
             if (NumBytesCPU%8 != 0) {
                 printf("The number of Bytes has to be a multiple of 8\n");
+                mem_is_mult_8 = false;
             }
     }
 
-	is_success = (CheckCPU && NumBytesCPU != 0) || (CheckGPU && NumBytesGPU != 0) || (IsDaemonStop);
+    mem_is_0 = (mega == 0) ? true : false;
 
-    if ( ( mSet !=1 && !IsDaemonStop ) || ( mega == 0 && !IsDaemonStop ) ) {
+    if ( ( !mem_is_set && !IsDaemonStop ) || (  mem_is_0 && !IsDaemonStop ) ) {
         printf("[Error] Memory region size not set!\n");
-        is_success = 0;
     }
 
 	if ( (WarningRate > 0 && strlen(WarningFile) == 0) )
 	{
-		is_success = 0;
+		parse_err = true;
 		printf("[Error] Parameters waring rate and warning file inconsistent!\n");
 	}
 
+	is_success = (mem_is_set && mem_is_mult_8 && !mem_is_0 && !parse_err) || IsDaemonStop;
+	
     if ( !is_success ) {
         print_usage(argv[0]);
     }
 
-	if (!IsDaemonStop && is_success) 
+    if (!IsDaemonStop && is_success) 
 	{
 		printf("Host name: %s\n", HostName);
         if (CheckCPU)
