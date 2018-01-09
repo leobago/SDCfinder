@@ -68,7 +68,6 @@
  ============================================================================
  */
 
-#include <getopt.h>
 #include "MemoryReliability_decl.h"
 
 //
@@ -111,7 +110,8 @@ bool parse_arguments(int argc, char* argv[])
     };
     
     int device;
-
+    bool is_success = true;
+    
     srand(time(NULL));
     unsigned char BinExpo = rand()%4;
     SleepTime = 0x0001<<BinExpo; // generate sleep time between 1 and 8 seconds
@@ -142,7 +142,6 @@ bool parse_arguments(int argc, char* argv[])
     {
         switch (c)
         {
-            case '0':
             case 'd':
 			    IsDaemonStart = 1;
                 break;
@@ -168,13 +167,13 @@ bool parse_arguments(int argc, char* argv[])
             case 'w':
 			    strcpy(WarningFile, optarg);
                 break;
-            case '?':
-                printf("ERROR: Invalid option!\n");
-                print_usage(argv[0]);
-                break;
             case ':':
-                printf("ERROR: missing argument!\n");
-                print_usage(argv[0]);
+                printf("[Error] missing argument for %s!\n", opts[optsIdx].name);
+                is_success = 0;
+                break;
+            case '?':
+                printf("[Error] Invalid option!\n");
+                is_success = 0;
                 break;
         }
     }
@@ -203,12 +202,24 @@ bool parse_arguments(int argc, char* argv[])
             }
     }
 
-    if ( mSet !=1 && !IsDaemonStop ) {
+	is_success = (CheckCPU && NumBytesCPU != 0) || (CheckGPU && NumBytesGPU != 0) || (IsDaemonStop);
+
+    if ( ( mSet !=1 && !IsDaemonStop ) || ( mega == 0 && !IsDaemonStop ) ) {
         printf("[Error] Memory region size not set!\n");
+        is_success = 0;
+    }
+
+	if ( (WarningRate > 0 && strlen(WarningFile) == 0) )
+	{
+		is_success = 0;
+		printf("[Error] Parameters waring rate and warning file inconsistent!\n");
+	}
+
+    if ( !is_success ) {
         print_usage(argv[0]);
     }
 
-	if (!IsDaemonStop)
+	if (!IsDaemonStop && is_success) 
 	{
 		printf("Host name: %s\n", HostName);
         if (CheckCPU)
@@ -228,18 +239,6 @@ bool parse_arguments(int argc, char* argv[])
 		printf("Warning file: %s\n", WarningFile);
 	}
 
-	bool is_success = (CheckCPU && NumBytesCPU != 0) || (CheckGPU && NumBytesGPU != 0) || (IsDaemonStop);
-
-	if ( (WarningRate > 0 && strlen(WarningFile) == 0) )
-	{
-		is_success = 0;
-		printf("[Error] Parameters waring rate and warning file inconsistent!\n");
-	}
-
-    if ( !is_success ) {
-        print_usage(argv[0]);
-    }
-
 	return is_success;
 }
 
@@ -253,14 +252,14 @@ void print_usage(char* program_name)
         "usage: %s -m <arg> [-d] [-c] [--cpu] [--gpu] [-o <arg>] [-s <arg>] [-w <arg>] [-f <arg>]\n"
 	    "    -d|--start-daemon: start as daemon. If not passed will start as a foreground process.\n"
 	    "    -c|--stop-daemon: stop the daemon.\n"
-        "    --cpu: check CPU memory.\n"
+        "    --cpu: check CPU memory (default).\n"
         "    --gpu: check GPU memory.\n"
-        "    -m: the size of the CPU or GPU memory to test in MB (depends on --gpu, --cpu flags).\n"
-	    "    -o: log file name [default=%s].\n"
-	    "    -e: error file name [default=%s].\n"
-	    "    -s: sleep time in seconds [default=%u].\n"
-	    "    -w: warning file [default=%s].\n"
-	    "    -f: warning rate [default=%u].\n"
+        "    -m|--memsize: the size of the CPU or GPU memory to test in MB (depends on --gpu, --cpu flags).\n"
+	    "    -o|--output-file: log file name [default=%s].\n"
+	    "    -e|--error-file: error file name [default=%s].\n"
+	    "    -s|--sleep-time: sleep time in seconds [default=%u].\n"
+	    "    -w|--warn-file: warning file [default=%s].\n"
+	    "    -f|--warn-rate: warning rate [default=%u].\n"
 	    "Example to start a daemon:\n"
 	    "    %s -d --cpu -m 1024 -s 10 -o full_path_to_logfile.log -- run as a daemon, test 1024MB of CPU memory, and sleep for 10sec, write logs to logfile.log.\n"
 	    "    %s -d --cpu -m 1024 -s 10 -o full_path_to_logfile.log -f 15 -w full_path_to_warningfile.txt -- "

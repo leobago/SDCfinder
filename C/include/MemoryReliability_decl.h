@@ -15,6 +15,7 @@
 #include <sys/syscall.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <getopt.h>
 
 #include "addresstranslation.h"
 #include "pmu.h"
