@@ -30,8 +30,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ============================================================================
-Name        : MemoryReliability.c
-Authors     : Ferad Zyulkyarov, Kai Keller, Leonardo Bautista-Gomez
+
+Filename    : MemoryReliability.c
+Authors     : Ferad Zyulkyarov, Kai Keller, Pau Farré, Leonardo Bautista-Gomez
 Version     :
 Copyright   :
 Description : A daemon which tests the memory for errors.
@@ -63,8 +64,7 @@ The client also intercepts and handles the SIGTERM signal and exists gently
 when such signal is received.
 
 ============================================================================
-Adaptation for Mare Nostrum IV, Oct 2017.
-Author      : Kai Keller
+Adaptation for Intel architectures, Oct 2017.
 ============================================================================
 */
 
@@ -174,10 +174,10 @@ bool parse_arguments(int argc, char* argv[])
                 SleepTime = (unsigned int)atoi(optarg);
                 break;
             case 'f':
-                WarningRate = (unsigned int)atoi(optarg);
+                WarnRate = (unsigned int)atoi(optarg);
                 break;
             case 'w':
-                strcpy(WarningFile, optarg);
+                strcpy(WarnFile, optarg);
                 break;
             case ':':
                 printf("[Error] missing argument for %s!\n", opts[optsIdx].name);
@@ -223,7 +223,7 @@ bool parse_arguments(int argc, char* argv[])
         printf("[Error] Memory region size not set!\n");
     }
 
-    if ( (WarningRate > 0 && strlen(WarningFile) == 0) )
+    if ( (WarnRate > 0 && strlen(WarnFile) == 0) )
     {
         parse_err = true;
         printf("[Error] Parameters waring rate and warning file inconsistent!\n");
@@ -251,8 +251,8 @@ bool parse_arguments(int argc, char* argv[])
         printf("Log file: %s\n", OutFile);
         printf("Error log file: %s\n", ErrFile);
         printf("Sleep time: %u\n", SleepTime);
-        printf("Warning rate: %u\n", WarningRate);
-        printf("Warning file: %s\n", WarningFile);
+        printf("Warning rate: %u\n", WarnRate);
+        printf("Warning file: %s\n", WarnFile);
     }
 
     return is_success;
@@ -294,7 +294,7 @@ void print_usage(char* program_name)
             "    %s -c\n"
             "Example to run as a foreground process:\n"
             "    %s --cpu -m 1024 -s 10 -- run as a daemon, test 1024MB of memory, and sleep for 10sec.\n",
-        program_name,OutFile, ErrFile, SleepTime, WarningFile, WarningRate, program_name, program_name, program_name, program_name, program_name);
+        program_name,OutFile, ErrFile, SleepTime, WarnFile, WarnRate, program_name, program_name, program_name, program_name, program_name);
 }
 
 /*

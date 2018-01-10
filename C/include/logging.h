@@ -10,13 +10,12 @@ extern uint64_t TEMP_FIELD_MASK;//                = 0x00000000003f0000; // selec
 
 
 extern char PidFileName[255];// = "pid.txt";
-extern char TemperatureFileName[255];// = "/sys/class/thermal/thermal_zone0/temp";
 extern char OutFile[255];// = "MemoryReliability.log";
-extern char WarningFile[255];// = "";
+extern char WarnFile[255];// = "MemoryReliability.warn";
 extern char ErrFile[255];// = "MemoryReliability.err";
 extern char DbgFile[255];// = "MemoryReliability.err";
 
-extern unsigned int WarningRate;// = 0;
+extern unsigned int WarnRate;// = 0;
 extern unsigned int NumErrors;// = 0;
 
 char HostName[255];
