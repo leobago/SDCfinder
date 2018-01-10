@@ -13,8 +13,9 @@ const unsigned int GIGA                 = 1073741824;
 char PidFileName[255] = "pid.txt";
 char TemperatureFileName[] = "/sys/class/thermal/thermal_zone0/temp";
 char OutFile[255] = "MemoryReliability.log";
-char WarningFile[255] = "MemoryReliability.dbg";
+char WarningFile[255] = "MemoryReliability.warn";
 char ErrFile[255] = "MemoryReliability.err";
+char DbgFile[255] = "MemoryReliability.dbg";
 
 unsigned int WarningRate = 0;
 unsigned int NumErrors = 0;

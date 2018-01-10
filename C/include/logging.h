@@ -14,6 +14,7 @@ extern char TemperatureFileName[255];// = "/sys/class/thermal/thermal_zone0/temp
 extern char OutFile[255];// = "MemoryReliability.log";
 extern char WarningFile[255];// = "";
 extern char ErrFile[255];// = "MemoryReliability.err";
+extern char DbgFile[255];// = "MemoryReliability.err";
 
 extern unsigned int WarningRate;// = 0;
 extern unsigned int NumErrors;// = 0;
