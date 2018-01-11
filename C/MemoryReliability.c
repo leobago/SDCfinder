@@ -103,6 +103,186 @@ int main(int argc, char* argv[])
 
 /*
    +===========================================================================+
+   |    START DAEMON                                                           |
+   +===========================================================================+
+   */
+
+void start_daemon()
+{
+    char start_msg[255];
+    //
+    // Fork child process
+    //
+    pid_t pid = fork();
+
+    if (pid < 0)
+    {
+        fprintf(stderr, "ERROR: Cannot create child process.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid > 0)
+    {
+        //
+        // Write the pid of the daemon to the pid file
+        //
+        daemon_pid_write_to_file(pid);
+        printf("forked PID: %i. Parent process exits now.\n", (int) pid); /*KAI*/
+
+        //
+        // Child process created exit parent process.
+        //
+        exit(EXIT_SUCCESS);
+    }
+
+    //
+    // Create session for our new process.
+    //
+    pid_t sid = setsid();
+    if (sid < 0)
+    {
+        fprintf(stderr, "ERROR_INFO,Cannot create session for the child process.\n");
+        log_message("ERROR_INFO,Cannot create session for the child process.");
+        exit(EXIT_FAILURE);
+    }
+
+    sprintf(start_msg, "START, SLEEP TIME (SECONDS): %u", SleepTime);
+    log_message(start_msg);
+    if (CheckCPU)
+    {
+        sprintf(start_msg, "INFO, ALLOCATED CPU MEMORY (BYTES): %llu, PATTERN (HEX): 0x%" PRIxPTR, NumBytesCPU, mem_pattern);
+        log_message(start_msg);
+    }
+    if (CheckGPU)
+    {
+        sprintf(start_msg, "INFO, ALLOCATED GPU MEMORY (BYTES): %llu, PATTERN (HEX): 0x%" PRIxPTR , NumBytesGPU, mem_pattern);
+        log_message(start_msg);
+    }
+    printf("Daemon started\n");
+
+    //
+    // Close all standard file descriptors
+    //
+    fclose(stdin);
+    fclose(stdout);
+    fclose(stderr);
+
+    //
+    // Install signal handler that responds to kill [pid] from the command line.
+    //
+    signal(SIGTERM, sigterm_signal_handler);
+
+    //
+    // Ignore signal when terminal session is closed. This keeps the
+    // daemon alive when the user closes the terminal session.
+    //
+    signal(SIGHUP, SIG_IGN);
+
+    // Initialize the memory before entering the daemon loop
+    if (CheckCPU)
+        initialize_cpu_memory();
+    if (CheckGPU)
+        initialize_gpu_memory();
+
+    //
+    // The daemon loop.
+    //
+    memory_test_loop(RANDOM);
+
+    if (CheckCPU)
+        free_cpu_memory();
+    if (CheckGPU)
+        free_gpu_memory();
+
+    exit(EXIT_SUCCESS);
+}
+
+/*
+   +===========================================================================+
+   |    STOP DAEMON                                                            |
+   +===========================================================================+
+   */
+
+void stop_daemon()
+{
+    pid_t pid = daemon_pid_read_from_file();
+    int kill_status = 0;
+    if (pid == 0)
+    {
+        fprintf(stderr, "ERROR: Could not find pid file (%s). If you are sure that the daemon is running, please, kill it manually.\n", PidFileName);
+    }
+    else
+    {
+        kill_status = kill(pid, SIGTERM);
+        if (kill_status == 0)
+        {
+            printf("The daemon stopped.\n");
+
+            //
+            // Delete the daemon pid file.
+            //
+            daemon_pid_delete_file();
+        }
+        else
+        {
+            fprintf(stderr, "ERROR: Failed to stop the daemon with pid %d.\n", pid);
+        }
+    }
+}
+
+/*
+   +===========================================================================+
+   |    START CLIENT                                                           |
+   +===========================================================================+
+   */
+
+void start_client()
+{
+    char start_msg[255];
+
+    //
+    // Install signal handler that responds to kill [pid] from the command line.
+    //
+    signal(SIGTERM, sigterm_signal_handler);
+
+    //
+    // Install signal handler that responds to Ctrl+C interrupt
+    //
+    signal(SIGINT, sigint_signal_handler);
+
+    printf("Client started...\n");
+
+    sprintf(start_msg, "START, SLEEP TIME (SECONDS): %u", SleepTime);
+    log_message(start_msg);
+    if (CheckCPU)
+    {
+        sprintf(start_msg, "INFO, ALLOCATED CPU MEMORY (BYTES): %llu, PATTERN (HEX): 0x%" PRIxPTR, NumBytesCPU, mem_pattern);
+        log_message(start_msg);
+    }
+    if (CheckGPU)
+    {
+        sprintf(start_msg, "INFO, ALLOCATED GPU MEMORY (BYTES): %llu, PATTERN (HEX): 0x%" PRIxPTR , NumBytesGPU, mem_pattern);
+        log_message(start_msg);
+    }
+
+    if (CheckCPU)
+        initialize_cpu_memory();
+    if (CheckGPU)
+        initialize_gpu_memory();
+
+    //
+    // The daemon loop.
+    //
+    memory_test_loop(RANDOM);
+
+    if (CheckCPU)
+        free_cpu_memory();
+    if (CheckGPU)
+        free_gpu_memory();
+}
+
+/*
+   +===========================================================================+
    |    PARSE ARGUMENTS                                                        |
    +===========================================================================+
    */
@@ -296,184 +476,3 @@ void print_usage(char* program_name)
             "    %s --cpu -m 1024 -s 10 -- run as a daemon, test 1024MB of memory, and sleep for 10sec.\n",
         program_name,OutFile, ErrFile, SleepTime, WarnFile, WarnRate, program_name, program_name, program_name, program_name, program_name);
 }
-
-/*
-   +===========================================================================+
-   |    START DAEMON                                                           |
-   +===========================================================================+
-   */
-
-void start_daemon()
-{
-    char start_msg[255];
-    //
-    // Fork child process
-    //
-    pid_t pid = fork();
-
-    if (pid < 0)
-    {
-        fprintf(stderr, "ERROR: Cannot create child process.\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if (pid > 0)
-    {
-        //
-        // Write the pid of the daemon to the pid file
-        //
-        daemon_pid_write_to_file(pid);
-        printf("forked PID: %i. Parent process exits now.\n", (int) pid); /*KAI*/
-
-        //
-        // Child process created exit parent process.
-        //
-        exit(EXIT_SUCCESS);
-    }
-
-    //
-    // Create session for our new process.
-    //
-    pid_t sid = setsid();
-    if (sid < 0)
-    {
-        fprintf(stderr, "ERROR_INFO,Cannot create session for the child process.\n");
-        log_message("ERROR_INFO,Cannot create session for the child process.");
-        exit(EXIT_FAILURE);
-    }
-
-    sprintf(start_msg, "START, SLEEP TIME (SECONDS): %u", SleepTime);
-    log_message(start_msg);
-    if (CheckCPU)
-    {
-        sprintf(start_msg, "INFO, ALLOCATED CPU MEMORY (BYTES): %llu, PATTERN (HEX): 0x%" PRIxPTR, NumBytesCPU, mem_pattern);
-        log_message(start_msg);
-    }
-    if (CheckGPU)
-    {
-        sprintf(start_msg, "INFO, ALLOCATED GPU MEMORY (BYTES): %llu, PATTERN (HEX): 0x%" PRIxPTR , NumBytesGPU, mem_pattern);
-        log_message(start_msg);
-    }
-    printf("Daemon started\n");
-
-    //
-    // Close all standard file descriptors
-    //
-    fclose(stdin);
-    fclose(stdout);
-    fclose(stderr);
-
-    //
-    // Install signal handler that responds to kill [pid] from the command line.
-    //
-    signal(SIGTERM, sigterm_signal_handler);
-
-    //
-    // Ignore signal when terminal session is closed. This keeps the
-    // daemon alive when the user closes the terminal session.
-    //
-    signal(SIGHUP, SIG_IGN);
-
-    // Initialize the memory before entering the daemon loop
-    if (CheckCPU)
-        initialize_cpu_memory();
-    if (CheckGPU)
-        initialize_gpu_memory();
-
-    //
-    // The daemon loop.
-    //
-    memory_test_loop(RANDOM);
-
-    if (CheckCPU)
-        free_cpu_memory();
-    if (CheckGPU)
-        free_gpu_memory();
-
-    exit(EXIT_SUCCESS);
-}
-
-/*
-   +===========================================================================+
-   |    STOP DAEMON                                                            |
-   +===========================================================================+
-   */
-
-void stop_daemon()
-{
-    pid_t pid = daemon_pid_read_from_file();
-    int kill_status = 0;
-    if (pid == 0)
-    {
-        fprintf(stderr, "ERROR: Could not find pid file (%s). If you are sure that the daemon is running, please, kill it manually.\n", PidFileName);
-    }
-    else
-    {
-        kill_status = kill(pid, SIGTERM);
-        if (kill_status == 0)
-        {
-            printf("The daemon stopped.\n");
-
-            //
-            // Delete the daemon pid file.
-            //
-            daemon_pid_delete_file();
-        }
-        else
-        {
-            fprintf(stderr, "ERROR: Failed to stop the daemon with pid %d.\n", pid);
-        }
-    }
-}
-
-/*
-   +===========================================================================+
-   |    START CLIENT                                                           |
-   +===========================================================================+
-   */
-
-void start_client()
-{
-    char start_msg[255];
-
-    //
-    // Install signal handler that responds to kill [pid] from the command line.
-    //
-    signal(SIGTERM, sigterm_signal_handler);
-
-    //
-    // Install signal handler that responds to Ctrl+C interrupt
-    //
-    signal(SIGINT, sigint_signal_handler);
-
-    printf("Client started...\n");
-
-    sprintf(start_msg, "START, SLEEP TIME (SECONDS): %u", SleepTime);
-    log_message(start_msg);
-    if (CheckCPU)
-    {
-        sprintf(start_msg, "INFO, ALLOCATED CPU MEMORY (BYTES): %llu, PATTERN (HEX): 0x%" PRIxPTR, NumBytesCPU, mem_pattern);
-        log_message(start_msg);
-    }
-    if (CheckGPU)
-    {
-        sprintf(start_msg, "INFO, ALLOCATED GPU MEMORY (BYTES): %llu, PATTERN (HEX): 0x%" PRIxPTR , NumBytesGPU, mem_pattern);
-        log_message(start_msg);
-    }
-
-    if (CheckCPU)
-        initialize_cpu_memory();
-    if (CheckGPU)
-        initialize_gpu_memory();
-
-    //
-    // The daemon loop.
-    //
-    memory_test_loop(RANDOM);
-
-    if (CheckCPU)
-        free_cpu_memory();
-    if (CheckGPU)
-        free_gpu_memory();
-}
-

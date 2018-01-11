@@ -1,37 +1,50 @@
 /*
- * addresstranslation.c
  *
- * Implements address translation from virtual to physical.
- * (see: http://fivelinesofcode.blogspot.com.es/2014/03/how-to-translate-virtual-to-physical.html)
+ * BSD 3-Clause License
  *
- */
+ * Copyright (c) 2017, Leo
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ *
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ *
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ ============================================================================
+
+Filename    : addresstranslation.c
+Authors     : Ferad Zyulkyarov, Kai Keller, Pau Farré, Leonardo Bautista-Gomez
+Version     :
+Copyright   :
+Description : A daemon which tests the memory for errors.
+
+This file provides a function to translate a virtual address to the physical
+address.
+*/
 
 #include "addresstranslation.h"
-#include "MemoryReliability_decl.h"
-
-#include <stdio.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <errno.h>
-#include <inttypes.h>
-
-//#define DEBUG_ON
-#define PAGE_SIZE sysconf(_SC_PAGESIZE)
-#define PAGEMAP_ENTRY 8 // entry size in bytes
-#define ENTRY_SIZE 64 // entry size in bits
-#define GET_BIT(X,Y) (X & ((uint64_t)1<<Y)) >> Y
-#define GET_PFN(X) X & 0x7FFFFFFFFFFFFF 
-#define GET_OFFSET(X) X & ( PAGE_SIZE -1 )
-#define MAX_ITER 1000
-
-// This file contains the page table (mapping virtual address -> physical address)
-#define page_mapping_file "/proc/self/pagemap"
-
-const int __endian_bit = 1;
-#define is_bigendian() ( (*(char*)&__endian_bit) == 0 )
-
 
 uintptr_t virtual_to_physical_address(uintptr_t virt_addr) {
+
     uintptr_t vpfn = 0; // virtual page frame number
     uintptr_t pfn = 0; // physical page frame number
     int pfo = 0; // page frame offset
@@ -50,7 +63,7 @@ uintptr_t virtual_to_physical_address(uintptr_t virt_addr) {
     if (fd == -1) {
         ierr = errno;
         fd_err = open(ErrFile, O_WRONLY|O_CREAT|O_APPEND, 0666);
-        dprintf(fd_err, "Cannot open %s. Please, run as root: -- %s\n", page_mapping_file, strerror(ierr));
+        dprintf(fd_err, "[Warning] Cannot open %s. Please, run as root: -- %s\n", page_mapping_file, strerror(ierr));
         close(fd_err);
         ierr = 0;
         return 0;

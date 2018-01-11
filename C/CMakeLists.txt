@@ -15,11 +15,17 @@ if (CMAKE_BUILD_TYPE AND
    message(FATAL_ERROR "Invalid value for CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 endif()
 
+# Debug flags
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wall -DDEBUG_ON")
+
 # Project options
 option(ENABLE_ERROR_INJECTION "Inject randomly errors in allocated memory region" OFF)
 if(ENABLE_ERROR_INJECTION)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DINJECT_ERR")
 endif()
+
+# Source files
+set(MR_SRC ${CMAKE_CURRENT_SOURCE_DIR}/lib/addresstranslation.c ${CMAKE_CURRENT_SOURCE_DIR}/lib/daemon.c ${CMAKE_CURRENT_SOURCE_DIR}/lib/injection.c ${CMAKE_CURRENT_SOURCE_DIR}/lib/logging.c ${CMAKE_CURRENT_SOURCE_DIR}/lib/memcheck.c ${CMAKE_CURRENT_SOURCE_DIR}/lib/MemoryReliability_defs.c ${CMAKE_CURRENT_SOURCE_DIR}/lib/tools.c ${CMAKE_CURRENT_SOURCE_DIR}/MemoryReliability.c)
 
 option(ENABLE_CUDA "Test GPU memory" ON)
 find_package(CUDA)
@@ -81,32 +87,31 @@ message(STATUS "CUDA_NVCC_FLAGS_DEBUG:          ${CUDA_NVCC_FLAGS_DEBUG}")
 message(STATUS "CUDA_NVCC_FLAGS_RELEASE:        ${CUDA_NVCC_FLAGS_RELEASE}")
 message(STATUS "----------------------------------------")
 
-add_library(addr    ${CMAKE_CURRENT_SOURCE_DIR}/lib/addresstranslation.c)
-target_include_directories(addr PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+#add_library(addr    ${CMAKE_CURRENT_SOURCE_DIR}/lib/addresstranslation.c)
+#target_include_directories(addr PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+#
+#add_library(logging ${CMAKE_CURRENT_SOURCE_DIR}/lib/logging.c)
+#target_include_directories(logging PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+#target_link_libraries(logging addr)
+#
+#set(MRLIB_SRC
+#        ${CMAKE_CURRENT_SOURCE_DIR}/lib/MemoryReliability_defs.c
+#        ${CMAKE_CURRENT_SOURCE_DIR}/lib/tools.c)
+#add_library(MRlib STATIC ${MRLIB_SRC})
+#target_include_directories(MRlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+#target_link_libraries(MRlib logging)
 
-add_library(logging ${CMAKE_CURRENT_SOURCE_DIR}/lib/logging.c)
-target_include_directories(logging PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(logging addr)
-
-set(MRLIB_SRC
-        ${CMAKE_CURRENT_SOURCE_DIR}/lib/MemoryReliability_defs.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/lib/pmu.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/lib/tools.c)
-add_library(MRlib STATIC ${MRLIB_SRC})
-target_include_directories(MRlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(MRlib logging)
+add_executable(MemoryReliability ${MR_SRC})
+target_include_directories(MemoryReliability PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 if (ENABLE_CUDA AND CUDA_FOUND)
     cuda_add_library(MRlib-cuda STATIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/tools.cu)
     set_target_properties(MRlib-cuda PROPERTIES CXX_STANDARD 11)
     target_include_directories(MRlib-cuda PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-    target_link_libraries(MRlib-cuda logging)
+    #    target_link_libraries(MRlib-cuda logging)
 
-    target_include_directories(MRlib PUBLIC ${CUDA_INCLUDE_DIRS})
-    target_link_libraries(MRlib MRlib-cuda stdc++ ${CUDA_LIBRARIES})
+    #    target_include_directories(MRlib PUBLIC ${CUDA_INCLUDE_DIRS})
+    target_link_libraries(MemoryReliability MRlib-cuda stdc++ ${CUDA_LIBRARIES})
 endif()
 
-add_executable(MemoryReliability MemoryReliability.c)
-target_include_directories(MemoryReliability PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(MemoryReliability MRlib)
 install(TARGETS MemoryReliability RUNTIME DESTINATION bin)
