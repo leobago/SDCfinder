@@ -40,6 +40,17 @@ Description : A daemon which tests the memory for errors.
 This file provides helper functions.
 */
 
+// TODO
+// 
+// the msr register name for ECC is IA32_MCi_STATUS. Explanations of the 
+// fields are given in Intel® 64 and IA-32 Architectures Software 
+// Developer’s Manual, Volume 3B: System Programming Guide, Part 2 in 
+// chapter 15.3.2.1 (page 48 in the pdf). Position in msr file (in hex) 
+// is 424H and for IA32_MC9_STATUS, where "Banks MC9 through MC 16 report 
+// MC error from each channel of the integrated memory controllers."
+//
+// In the registers are also ecc counter.
+
 #include "MemoryReliability_decl.h"
 
 bool is_initialized(void* ptr)
