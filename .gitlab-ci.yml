@@ -1,0 +1,178 @@
+#default image (docker best practices advice against using :latest tags, be advised)
+image: gcc:7
+
+stages:
+  - build
+  - test
+
+#
+## stage: build
+#
+
+.job_build_template: &build_cpu_tdef
+  stage: build
+  variables:
+    version: "3.7"
+    build: "2"
+  before_script:
+    - wget https://cmake.org/files/v$version/cmake-$version.$build-Linux-x86_64.sh
+    - sh ./cmake-$version.$build-Linux-x86_64.sh --prefix=/usr/local --skip-license
+  script:
+    - mkdir build
+    - cd build
+    - cmake ../C -DENABLE_ERROR_INJECTION=ON
+    - make
+    - make install
+  tags:
+    - cpu
+  artifacts:
+    name: "${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}_build"
+    when: on_success
+    expire_in: 1h
+    paths:
+      - build/MemoryReliability
+  dependencies: []
+
+.job_build_cuda_template: &build_gpu_tdef
+  stage: build
+  variables:
+    version: "3.7"
+    build: "2"
+  before_script:
+    - apt update && apt install -y --no-install-recommends wget ca-certificates
+    - wget https://cmake.org/files/v$version/cmake-$version.$build-Linux-x86_64.sh
+    - sh ./cmake-$version.$build-Linux-x86_64.sh --prefix=/usr/local --skip-license
+  script:
+    - mkdir build
+    - cd build
+    - cmake ../C -DENABLE_ERROR_INJECTION=ON -DENABLE_CUDA=ON
+    - make
+    - make install
+  tags:
+    - gpu
+  artifacts:
+    name: "${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}_build"
+    when: on_success
+    expire_in: 1h
+    paths:
+      - build/MemoryReliability
+  dependencies: []
+
+
+build:gcc-7:
+  image: gcc:7
+  <<: *build_cpu_tdef
+
+build:gcc-6:
+  image: gcc:6
+  <<: *build_cpu_tdef
+
+build:gcc-5:
+  image: gcc:5
+  <<: *build_cpu_tdef
+
+build:gcc-4:
+  image: gcc:4
+  <<: *build_cpu_tdef
+
+build:cuda-8:
+  image: nvidia/cuda:8.0-devel
+  <<: *build_gpu_tdef
+
+build:cuda-9:
+  image: nvidia/cuda:9.0-devel
+  <<: *build_gpu_tdef
+
+#
+## stage: test
+#
+
+##
+## WARNING: MemoryReliability requires 'msr' kernel module!
+##
+.job_test__cpu_template: &test_cpu_tdef
+  stage: test
+  before_script:
+    - apt update
+    - apt install -y --no-install-recommends kmod
+    - lsmod | grep msr
+    - ls -la /dev/cpu/
+    - ls -la /usr/local
+  script:
+    - build/MemoryReliability -d --cpu -m 1024 -s 1 -o output.log -e output.err
+    - sleep 40
+    - build/MemoryReliability -c
+    - cat output.log
+    - cat output.err
+  tags:
+    - cpu
+  artifacts:
+    name: "${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}_test"
+    when: on_success
+    expire_in: 1h
+    paths:
+      - output.log
+      - output.err
+
+.job_test_gpu_template: &test_gpu_tdef
+  stage: test
+  before_script:
+    - apt update
+    - apt install -y --no-install-recommends kmod
+    - lsmod | grep msr
+    - ls -la /dev/cpu/
+    - ls -la /usr/local
+  script:
+    - build/MemoryReliability -d --gpu -m 1024 -s 1 -o output.log -e output.err
+    - sleep 40
+    - build/MemoryReliability -c
+    - cat output.log
+    - cat output.err
+  tags:
+    - gpu
+  artifacts:
+    name: "${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}_test"
+    when: on_success
+    expire_in: 1h
+    paths:
+      - output.log
+      - output.err
+
+
+test:gcc-7:
+  image: gcc:7
+  <<: *test_cpu_tdef
+  dependencies:
+    - build:gcc-7
+
+test:gcc-6:
+  image: gcc:6
+  <<: *test_cpu_tdef
+  dependencies:
+    - build:gcc-6
+
+test:gcc-5:
+  image: gcc:5
+  <<: *test_cpu_tdef
+  dependencies:
+    - build:gcc-5
+
+test:gcc-4:
+  image: gcc:4
+  <<: *test_cpu_tdef
+  dependencies:
+    - build:gcc-4
+
+test:cuda-8:
+  image: nvidia/cuda:8.0-devel
+  <<: *test_gpu_tdef
+  dependencies:
+    - build:cuda-8
+
+test:cuda-9:
+  image: nvidia/cuda:9.0-devel
+  <<: *test_gpu_tdef
+  dependencies:
+    - build:cuda-9
+
+

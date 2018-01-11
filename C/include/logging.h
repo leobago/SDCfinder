@@ -31,34 +31,25 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ============================================================================
 
-Filename    : addresstranslation.h
+Filename    : logging.h
 Authors     : Ferad Zyulkyarov, Kai Keller, Pau Farré, Leonardo Bautista-Gomez
 Version     :
 Copyright   :
 Description : A daemon which tests the memory for errors.
 
-Header file for addresstranslation.c
+Header file for logging.h
 */
 
-#ifndef __ADDRESS_TRANSLATION_H
-#define __ADDRESS_TRANSLATION_H
+#ifndef LOGGING_H
+#define LOGGING_H
 
 #include "MemoryReliability_decl.h"
 
-#define PAGE_SIZE sysconf(_SC_PAGESIZE)
-#define PAGEMAP_ENTRY 8 // entry size in bytes
-#define ENTRY_SIZE 64 // entry size in bits
-#define GET_BIT(X,Y) (X & ((uint64_t)1<<Y)) >> Y
-#define GET_PFN(X) X & 0x7FFFFFFFFFFFFF 
-#define GET_OFFSET(X) X & ( PAGE_SIZE -1 )
-#define MAX_ITER 1000
+extern const unsigned int TCC_ACT_TEMP;//         = 100; // TCC activation temperature
+extern const unsigned int TEMP_FIELD_LOW_BIT;//   = 16; // low bit of 6 bit temp value
+extern const unsigned int TEMP_FIELD_OFFSET;//    = 412; // offset in /dev/cpu/#cpu/msr file
+extern uint64_t TEMP_FIELD_MASK;//                = 0x00000000003f0000; // selects 6 bit field[22:16]
 
-// This file contains the page table (mapping virtual address -> physical address)
-#define page_mapping_file "/proc/self/pagemap"
+void warn_for_errors();
 
-const int __endian_bit = 1;
-#define is_bigendian() ( (*(char*)&__endian_bit) == 0 )
-
-
-#endif
-
+#endif //LOGGING_H
