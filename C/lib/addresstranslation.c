@@ -73,7 +73,7 @@ uintptr_t virtual_to_physical_address(uintptr_t virt_addr) {
     vpfn = virt_addr / PAGE_SIZE;
 
     // set file pointer
-    file_offset = vpfn * PAGEMAP_ENTRY;
+    file_offset = vpfn * PAGEMAP_ENTRY_BYTES;
 
     ierr = lseek(fd, file_offset, SEEK_SET);
     if (ierr == -1) {
@@ -94,9 +94,9 @@ uintptr_t virtual_to_physical_address(uintptr_t virt_addr) {
     dprintf(fd_dbg, "virt_addr : 0x%" PRIxPTR "\n", virt_addr);
     dprintf(fd_dbg, "page size : %li\n", PAGE_SIZE);
     dprintf(fd_dbg, "big endian : %i\n", is_bigendian());
-    for(i=0; i<ENTRY_SIZE; i++) {
+    for(i=0; i<PAGEMAP_ENTRY_BITS; i++) {
         page_table_entry_big_endian += GET_BIT( page_table_entry, i );
-        if( i<ENTRY_SIZE-1 ) {
+        if( i<PAGEMAP_ENTRY_BITS-1 ) {
             page_table_entry_big_endian <<= 1;
         }
     }
@@ -106,9 +106,9 @@ uintptr_t virtual_to_physical_address(uintptr_t virt_addr) {
     // if big endian, swap entries before apply GET_PFN macro
     page_table_entry_big_endian = 0;
     if( is_bigendian() ) {
-        for(i=0; i<ENTRY_SIZE; i++) {
+        for(i=0; i<PAGEMAP_ENTRY_BITS; i++) {
             page_table_entry_big_endian += GET_BIT( page_table_entry, i );
-            if( i<ENTRY_SIZE-1 ) {
+            if( i<PAGEMAP_ENTRY_BITS-1 ) {
                 page_table_entry_big_endian <<= 1;
             }
         }
@@ -134,9 +134,9 @@ uintptr_t virtual_to_physical_address(uintptr_t virt_addr) {
     // if big endian, swap back to normal
     phys_addr_big_endian = 0;
     if( is_bigendian() ) {
-        for(i=0; i<ENTRY_SIZE; i++) {
+        for(i=0; i<PAGEMAP_ENTRY_BITS; i++) {
             phys_addr_big_endian += GET_BIT( phys_addr, i );
-            if( i<ENTRY_SIZE-1 ) {
+            if( i<PAGEMAP_ENTRY_BITS-1 ) {
                 phys_addr_big_endian <<= 1;
             }
         }

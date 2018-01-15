@@ -30,33 +30,66 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ============================================================================
-
-Filename    : addresstranslation.h
-Authors     : Ferad Zyulkyarov, Kai Keller, Pau Farré, Leonardo Bautista-Gomez
-Version     :
-Copyright   :
-Description : A daemon which tests the memory for errors.
-
-Header file for addresstranslation.c
 */
+
+/** \file   addresstranslation.h
+ *  \author Ferad Zyulkyarov
+ *  \author Kai Keller
+ *  \author Pau Farré
+ *  \author Leonardo Bautista-Gomez
+ *  \brief  Header file for addresstranslation.c
+ */
 
 #ifndef __ADDRESS_TRANSLATION_H
 #define __ADDRESS_TRANSLATION_H
 
 #include "MemoryReliability_decl.h"
 
+/*! page size of virtual and physical memory */
 #define PAGE_SIZE sysconf(_SC_PAGESIZE)
-#define PAGEMAP_ENTRY 8 // entry size in bytes
-#define ENTRY_SIZE 64 // entry size in bits
+
+/*! length of each page-table entry in bytes */
+#define PAGEMAP_ENTRY_BYTES 8
+
+/*! length of each page-table entry in bits */
+#define PAGEMAP_ENTRY_BITS 64
+
+/*! get bit at pos Y in X 
+ *  \param  X   [in]    uint64_t value
+ *  \param  Y   [out]   position of bit to return
+ *  \return Bit value at position Y in X 
+ *
+ *  The bit position Y is counted from the right 
+ **/
 #define GET_BIT(X,Y) (X & ((uint64_t)1<<Y)) >> Y
+
+/*! \brief  extract page frame number (PFN) from page table entry X 
+ *  \param  X   [in]    uint64_t page-table entry
+ *  \return PFN 
+ *  
+ *  This macro sets bits 53 - 64 of the page-table entry to zero in order
+ *  to acquire the PFN.
+ *
+ *  notice: mask for little endian. big-endian value must be swapped first 
+ */
 #define GET_PFN(X) X & 0x7FFFFFFFFFFFFF 
+
+/*! \brief  get address offset
+ *  \param  X   [in]    uintptr_t virtual-address value
+ *  \return offset of virtual-address value
+ *
+ *  This macro returns the offset to the page frame of the virtual-address value
+ * */
 #define GET_OFFSET(X) X & ( PAGE_SIZE -1 )
+
+/*! security measure to prevent infinite loop execution */
 #define MAX_ITER 1000
 
-// This file contains the page table (mapping virtual address -> physical address)
+/*! file containing the page table (mapping virtual address -> physical address) */
 #define page_mapping_file "/proc/self/pagemap"
 
 const int __endian_bit = 1;
+/*! check endianess */
 #define is_bigendian() ( (*(char*)&__endian_bit) == 0 )
 
 
