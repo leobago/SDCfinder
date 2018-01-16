@@ -18,7 +18,7 @@ unsigned char* random_ptr_inside(unsigned char* start, unsigned long long size)
 
 unsigned char* align_to_addrvalue(unsigned char* ptr_data)
 {
-    uintptr_t ptrmask = sizeof(uintptr_t)-1;// TODO should we take the sizeof ADDRVALUE here?
+    uintptr_t ptrmask = sizeof(ADDRVALUE)-1;
     return (unsigned char*) ((uintptr_t)ptr_data & ~ptrmask);
 }
 
@@ -33,15 +33,14 @@ void inject_cpu_error(unsigned char* start, ADDRVALUE expected_value, Strategy_t
 #ifdef INJECT_ERR
     unsigned char *ptr_data = NULL;
 
-    if (inject_dice_roll()) { // FIXME the caller should decide to inject or not
+    if (inject_dice_roll()) { // FIXME the caller should decide when to inject
         switch (s) {
         case SIMPLE:
             break;
         case ZERO:
             ptr_data = random_ptr_inside(start, NumBytesCPU);
             memset(ptr_data, 0x1, 1);
-            // TODO ask if this is correct;
-            // We write to an address and print a different one.
+            // We print the ADDRVALUE-aligned address to match the error report
             ptr_data = align_to_addrvalue(ptr_data);
             break;
         case RANDOM:
@@ -67,7 +66,7 @@ void inject_gpu_error(unsigned char* start, ADDRVALUE expected_value, Strategy_t
     unsigned char *ptr_data = NULL;
     cudaError_t err;
 
-    if (inject_dice_roll()) { // FIXME the caller should decide to inject or not
+    if (inject_dice_roll()) { // FIXME the caller should decide when to inject
         switch (s) {
         case SIMPLE:
             break;
@@ -81,8 +80,7 @@ void inject_gpu_error(unsigned char* start, ADDRVALUE expected_value, Strategy_t
                         cudaGetErrorName(err), cudaGetErrorString(err));
                 log_message(msg);
             }
-            // TODO ask if this is correct;
-            // We write to an address and print a different one.
+            // We print the ADDRVALUE-aligned address to match the error report
             ptr_data = align_to_addrvalue(ptr_data);
             break;
         case RANDOM:
