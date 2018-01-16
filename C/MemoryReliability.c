@@ -31,7 +31,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ============================================================================
  Name        : MemoryReliability.c
- Authors     : Ferad Zyulkyarov, Kai Keller, Leonardo Bautista-Gomez
+ Authors     : Ferad Zyulkyarov, Kai Keller, Leonardo Bautista-Gomez,
+               Pau Farre, Marc Jorda
  Version     :
  Copyright   :
  Description : A daemon which tests the memory for errors.
@@ -65,6 +66,9 @@
  ============================================================================
  Adaptation for Mare Nostrum IV, Oct 2017.
  Author      : Kai Keller
+ ============================================================================
+ Support for GPU memory tests, Dec 2017.
+ Authors     : Pau Farre, Marc Jorda
  ============================================================================
  */
 
