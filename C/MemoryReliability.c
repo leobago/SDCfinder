@@ -69,6 +69,9 @@
  ============================================================================
  Support for GPU memory tests, Dec 2017.
  Authors     : Pau Farre, Marc Jorda
+ Organization: Accelerators and Communications for HPC Team,
+               Barcelona Supercomputing Center
+ Contact: accelcom@bsc.es
  ============================================================================
  */
 
