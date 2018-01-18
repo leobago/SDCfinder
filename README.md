@@ -1,4 +1,5 @@
 # SDCfinder
+[![pipeline status](https://gitlab.com/bsc-gcoe/SDCfinder/badges/master/pipeline.svg)](https://gitlab.com/bsc-gcoe/SDCfinder/commits/master)
 
 This tool aims to detect Silent Data Corruption (SDC) ocurring in
 supercomputers and large datacenters. The current implementation is in C but we

@@ -1,4 +1,69 @@
-#include "MemoryReliability_decl.h"
+#include "logging.h"
+
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <errno.h>
+#include <time.h>
+
+#include <inttypes.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include "addresstranslation.h"
+
+int read_temperature()
+{
+    int fd, fd_err, core = 0, ierr;
+    uint64_t temp;
+    char msr_file[32];
+    memset(msr_file, 0, 32);
+
+#ifdef SYS_getcpu
+    if (syscall(SYS_getcpu, &core, NULL, NULL) < 0) {
+        core = 0;
+    }
+#endif
+
+    fd_err = open(ErrFile, O_WRONLY|O_CREAT|O_APPEND, 0666);
+
+    snprintf(msr_file, 31, "/dev/cpu/%u/msr", core);
+    fd = open(msr_file, O_RDONLY);
+    if (fd == -1) {
+        ierr = errno;
+        dprintf(fd_err, "could not OPEN msr file: %s\n", strerror(ierr));
+        ierr = 0;
+        return -1;
+    }
+
+    ierr = pread(fd, &temp, sizeof(temp), TEMP_FIELD_OFFSET);
+    if (ierr == -1) {
+        ierr = errno;
+        dprintf(fd_err, "could not READ msr file: %s\n", strerror(ierr));
+        ierr = 0;
+        return -1;
+    }
+
+    temp &= TEMP_FIELD_MASK;
+    temp >>= TEMP_FIELD_LOW_BIT;
+    temp = TCC_ACT_TEMP - temp;
+
+    close(fd_err);
+    close(fd);
+
+    return temp;
+}
+
+time_t get_formatted_timestamp(char* out_time_formatted, unsigned char num_bytes)
+{
+    time_t rawtime;
+    struct tm *info;
+    time(&rawtime);
+    info = localtime(&rawtime);
+    strftime(out_time_formatted, num_bytes, "%x - %H:%M:%S", info);
+    return rawtime;
+}
 
 void warn_for_errors()
 {
@@ -21,6 +86,7 @@ void log_error(void* address, ADDRVALUE actual_value, ADDRVALUE expected_value)
 	FILE *f = fopen(OutFile, "a+");
 	if (!f)
 	{
+        printf("ERROR, something went wrong opening file %s!: %s\n", OutFile, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
     int field_width_value = 16;
@@ -46,6 +112,7 @@ void log_message(char* message)
 	FILE *f = fopen(OutFile, "a+");
 	if (!f)
 	{
+        printf("ERROR, something went wrong opening file %s!: %s\n", OutFile, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 	temperature = read_temperature();

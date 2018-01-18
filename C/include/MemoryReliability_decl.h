@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <time.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -17,54 +18,41 @@
 
 #include "addresstranslation.h"
 #include "pmu.h"
+#include "types.h"
+#include "logging.h"
 
 // DEFINITIONS
-typedef uintptr_t ADDRVALUE;
-typedef void* ADDRESS;
 
-const unsigned int TCC_ACT_TEMP;//         = 100; // TCC activation temperature
-const unsigned int TEMP_FIELD_LOW_BIT;//   = 16; // low bit of 6 bit temp value
-const unsigned int TEMP_FIELD_OFFSET;//    = 412; // offset in /dev/cpu/#cpu/msr file
-uint64_t TEMP_FIELD_MASK;//                = 0x00000000003f0000; // selects 6 bit field[22:16]
-const unsigned int KILO;//                 = 1024;
-const unsigned int MEGA;//                 = 1048576;
-const unsigned int GIGA;//                 = 1073741824;
+extern const unsigned int KILO;//                 = 1024;
+extern const unsigned int MEGA;//                 = 1048576;
+extern const unsigned int GIGA;//                 = 1073741824;
 
 // STATIC VARIABLES
-char PidFileName[255];// = "pid.txt";
-char TemperatureFileName[255];// = "/sys/class/thermal/thermal_zone0/temp";
-char OutFile[255];// = "MemoryReliability.log";
-char WarningFile[255];// = "";
-char ErrFile[255];// = "MemoryReliability.err";
 
-unsigned int WarningRate;// = 0;
-unsigned int NumErrors;// = 0;
-
-char HostName[255];
-
-unsigned long long NumBytes;// = 0;
-void* Mem;// = NULL;
+unsigned long long NumBytesCPU;// = 0;
+unsigned long long NumBytesGPU;// = 0;
+void* cpu_mem;// = NULL;
+void* gpu_mem;// = NULL;
 unsigned char mem_pattern;
 
-unsigned int SleepTime;// = 0;
-unsigned char ExitNow;// = 0;
-unsigned char IsDaemonStart;// = 0;
-unsigned char IsDaemonStop;// = 0;
+extern unsigned int SleepTime;// = 0;
+extern bool ExitNow;// = 0;
+extern bool IsDaemonStart;// = 0;
+extern bool IsDaemonStop;// = 0;
+bool CheckCPU;
+bool CheckGPU;
 
 // FUNCTIONS
-void log_error(void* address, ADDRVALUE actual_value, ADDRVALUE expected_value);
-void log_message(char* message);
-void warn_for_errors();
-void log_local_mem_errors(int local_mem_errors); // Logs local memory errors
 
-void simple_memory_test(void* buffer, unsigned int num_bytes);
-void zero_one_test(void* buffer, unsigned int num_bytes);
-void random_pattern_test(void* buffer, unsigned int num_bytes);
+void memory_test_loop(Strategy_t type);
 
-unsigned char parse_arguments(int argc, char* argv[]);
-void print_usage();
+bool parse_arguments(int argc, char* argv[]);
+void print_usage(char* program_name);
 void check_no_daemon_running();
-void initialize_memory();
+void initialize_cpu_memory();
+void initialize_gpu_memory();
+void free_cpu_memory();
+void free_gpu_memory();
 void start_daemon();
 void stop_daemon();
 void start_client();
@@ -77,6 +65,5 @@ unsigned char daemon_pid_file_exists();
 pid_t daemon_pid_read_from_file();
 void daemon_pid_delete_file();
 
-int read_temperature();
 
 #endif

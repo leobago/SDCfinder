@@ -31,7 +31,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ============================================================================
  Name        : MemoryReliability.c
- Authors     : Ferad Zyulkyarov, Kai Keller, Leonardo Bautista-Gomez
+ Authors     : Ferad Zyulkyarov, Kai Keller, Leonardo Bautista-Gomez,
+               Pau Farre, Marc Jorda
  Version     :
  Copyright   :
  Description : A daemon which tests the memory for errors.
@@ -66,9 +67,15 @@
  Adaptation for Mare Nostrum IV, Oct 2017.
  Author      : Kai Keller
  ============================================================================
+ Support for GPU memory tests, Dec 2017.
+ Authors     : Pau Farre, Marc Jorda
+ Organization: Accelerators and Communications for HPC Team,
+               Barcelona Supercomputing Center
+ Contact: accelcom@bsc.es
+ ============================================================================
  */
 
-#include "include/MemoryReliability_decl.h"
+#include "MemoryReliability_decl.h"
 
 //
 // The main daemon task
@@ -76,7 +83,7 @@
 
 int main(int argc, char* argv[])
 {
-	char is_init = parse_arguments(argc, argv);
+	bool is_init = parse_arguments(argc, argv);
 	if (!is_init)
 	{
 		print_usage(argv[0]);
@@ -100,11 +107,10 @@ int main(int argc, char* argv[])
 	return EXIT_SUCCESS;
 }
 
-unsigned char parse_arguments(int argc, char* argv[])
+bool parse_arguments(int argc, char* argv[])
 {
 	int i = 1;
 	unsigned int mega = 0;
-	unsigned char is_success = 0;
 
     srand(time(NULL));
     unsigned char BinExpo = rand()%4;
@@ -124,15 +130,36 @@ unsigned char parse_arguments(int argc, char* argv[])
 		{
 			IsDaemonStart = 1;
 		}
-		if (strcmp(argv[i], "-m") == 0)
-		{
-			i++;
-			mega = (unsigned int)atoi(argv[i]);
-			NumBytes = (unsigned long long)mega * (unsigned long long)MEGA;
-            if (NumBytes%8 != 0) {
-                printf("The number of Bytes has to be a multiple of 8");
+        if (strcmp(argv[i], "--cpu") == 0)
+        {
+            i++;
+            CheckCPU = 1;
+
+            if (strcmp(argv[i], "-m") == 0)
+            {
+                i++;
+                unsigned int mega = (unsigned int)atoi(argv[i]);
+                NumBytesCPU = (unsigned long long)mega * (unsigned long long)MEGA;
+                if (NumBytesCPU%8 != 0) {
+                    printf("The number of Bytes has to be a multiple of 8");
+                }
             }
-		}
+        }
+        if (strcmp(argv[i], "--gpu") == 0)
+        {
+            i++;
+            CheckGPU = 1;
+
+            if (strcmp(argv[i], "-m") == 0)
+            {
+                i++;
+                unsigned int mega = (unsigned int)atoi(argv[i]);
+                NumBytesGPU = (unsigned long long)mega * (unsigned long long)MEGA;
+                if (NumBytesGPU%8 != 0) {
+                    printf("The number of Bytes has to be a multiple of 8");
+                }
+            }
+        }
 		if (strcmp(argv[i], "-o") == 0)
 		{
 			i++;
@@ -163,8 +190,16 @@ unsigned char parse_arguments(int argc, char* argv[])
 	if (!IsDaemonStop)
 	{
 		printf("Host name: %s\n", HostName);
-		printf("Memory size: %llu bytes = %llu MB\n", NumBytes, NumBytes/MEGA);
-        printf("Memory pattern (hex): 0x%" PRIxPTR "\n", mem_pattern);
+        if (CheckCPU)
+        {
+            printf("CPU Memory size: %llu bytes = %llu MB\n", NumBytesCPU, NumBytesCPU/MEGA);
+            printf("CPU Memory pattern (hex): 0x%" PRIxPTR "\n", mem_pattern);
+        }
+        if (CheckGPU)
+        {
+            printf("GPU Memory size: %llu bytes = %llu MB\n", NumBytesGPU, NumBytesGPU/MEGA);
+            printf("GPU Memory pattern (hex): 0x%" PRIxPTR "\n", mem_pattern);
+        }
 		printf("Log file: %s\n", OutFile);
 		printf("Error log file: %s\n", ErrFile);
 		printf("Sleep time: %u\n", SleepTime);
@@ -172,7 +207,7 @@ unsigned char parse_arguments(int argc, char* argv[])
 		printf("Warning file: %s\n", WarningFile);
 	}
 
-	is_success = (NumBytes != 0) || (IsDaemonStop);
+	bool is_success = (CheckCPU && NumBytesCPU != 0) || (CheckGPU && NumBytesGPU != 0) || (IsDaemonStop);
 
 	if ((WarningRate > 0 && strlen(WarningFile) == 0) || (WarningRate == 0 && strlen(WarningFile) > 0))
 	{
@@ -186,22 +221,26 @@ void print_usage(char* program_name)
 {
 	printf("Memory scanner by Ferad Zyulkyarov\n");
 	printf("This program starts a daemon for memory test or stops an already running daemon.\n");
-	printf("Options: [-d] [-c] -m [-o] [-s] [-wn] [-wf]\n");
+	printf("Options: [-d] [-c] [--cpu [-m]] [--gpu [-m]] [-o] [-s] [-wn] [-wf]\n");
 	printf("    -d: start as daemon. If not passed will start as a foreground process.\n");
 	printf("    -c: stop the daemon.\n");
-	printf("    -m: the size of the memory to test in MB.\n");
+    printf("    --cpu: check CPU memory.\n");
+    printf("    -m: the size of the CPU memory to test in MB.\n");
+    printf("    --gpu: check GPU memory.\n");
+    printf("    -m: the size of the GPU memory to test in MB.\n");
 	printf("    -o: log file name [default=%s].\n", OutFile);
 	printf("    -e: error file name [default=%s].\n", ErrFile);
 	printf("    -s: sleep time in seconds [default=%u].\n", SleepTime);
 	printf("    -wn: warning rate [default=%u].\n", WarningRate);
 	printf("    -wf: warning file [default=%s].\n", WarningFile);
 	printf("Example to start a daemon:\n");
-	printf("    %s -d -m 1024 -s 10 -o full_path_to_logfile.log -- run as a daemon, test 1024MB of memory, and sleep for 10sec, write logs to logfile.log.\n", program_name);
-	printf("    %s -d -m 1024 -s 10 -o full_path_to_logfile.log -wn 15 -wf full_path_to_warningfile.txt -- run as a daemon, test 1024MB of memory, and sleep for 10sec, write logs to logfile.log, if there are more than (-wn) 10 errors detected write the name of the host to file warning.txt\n", program_name);
-	printf("Example to stop a daemon: \n");
+	printf("    %s -d --cpu -m 1024 -s 10 -o full_path_to_logfile.log -- run as a daemon, test 1024MB of CPU memory, and sleep for 10sec, write logs to logfile.log.\n", program_name);
+	printf("    %s -d --cpu -m 1024 -s 10 -o full_path_to_logfile.log -wn 15 -wf full_path_to_warningfile.txt -- run as a daemon, test 1024MB of CPU memory, and sleep for 10sec, write logs to logfile.log, if there are more than (-wn) 10 errors detected write the name of the host to file warning.txt\n", program_name);
+    printf("    %s -d --cpu -m 1024 --gpu -m 2048 -s 5 -o full_path_to_logfile.log -wn 15 -wf full_path_to_warningfile.txt -- run as a daemon, test 1024MB of CPU memory, test 2048MB of GPU memory, and sleep for 5sec, write logs to logfile.log, if there are more than (-wn) 10 errors detected write the name of the host to file warning.txt\n", program_name);
+    printf("Example to stop a daemon: \n");
 	printf("    %s -c\n", program_name);
 	printf("Example to run as a foreground process:\n");
-	printf("    %s -m 1024 -s 10 -- run as a daemon, test 1024MB of memory, and sleep for 10sec.\n", program_name);
+	printf("    %s --cpu -m 1024 -s 10 -- run as a daemon, test 1024MB of memory, and sleep for 10sec.\n", program_name);
 }
 
 void start_daemon()
@@ -258,9 +297,18 @@ void start_daemon()
 	//	log_message("ERROR_INFO,Cannot change the working directory.");
 	//	exit(EXIT_FAILURE);
 	//}
-
-	sprintf(start_msg, "START, ALLOCATED MEMORY (BYTES): %llu, PATTERN (HEX): 0x%" PRIxPTR ", SLEEP TIME (SECONDS): %u", NumBytes, mem_pattern, SleepTime);
-	log_message(start_msg);
+    sprintf(start_msg, "START, SLEEP TIME (SECONDS): %u", SleepTime);
+    log_message(start_msg);
+    if (CheckCPU)
+    {
+        sprintf(start_msg, "INFO, ALLOCATED CPU MEMORY (BYTES): %llu, PATTERN (HEX): 0x%" PRIxPTR, NumBytesCPU, mem_pattern);
+        log_message(start_msg);
+    }
+    if (CheckGPU)
+    {
+        sprintf(start_msg, "INFO, ALLOCATED GPU MEMORY (BYTES): %llu, PATTERN (HEX): 0x%" PRIxPTR , NumBytesGPU, mem_pattern);
+        log_message(start_msg);
+    }
 	printf("Daemon started\n");
 
 	//
@@ -281,12 +329,21 @@ void start_daemon()
 	//
 	signal(SIGHUP, SIG_IGN);
 
+    // Initialize the memory before entering the daemon loop
+    if (CheckCPU)
+        initialize_cpu_memory();
+    if (CheckGPU)
+        initialize_gpu_memory();
+
 	//
 	// The daemon loop.
 	//
-	initialize_memory();
-	//simple_memory_test(Mem, NumBytes);
-	random_pattern_test(Mem, NumBytes);
+    memory_test_loop(RANDOM);
+
+    if (CheckCPU)
+        free_cpu_memory();
+    if (CheckGPU)
+        free_gpu_memory();
 
 	exit(EXIT_SUCCESS);
 }
@@ -333,12 +390,33 @@ void start_client()
 	signal(SIGINT, sigint_signal_handler);
 
 	printf("Client started...\n");
-	sprintf(start_msg, "START, ALLOCATED MEMORY (BYTES): %llu, PATTERN (HEX): 0x%" PRIxPTR ", SLEEP TIME (SECONDS): %u", NumBytes, mem_pattern, SleepTime);
-	log_message(start_msg);
 
-	initialize_memory();
-	//simple_memory_test(Mem, NumBytes);
-	//zero_one_test(Mem, NumBytes);
-    random_pattern_test(Mem, NumBytes);
+    sprintf(start_msg, "START, SLEEP TIME (SECONDS): %u", SleepTime);
+    log_message(start_msg);
+    if (CheckCPU)
+    {
+        sprintf(start_msg, "INFO, ALLOCATED CPU MEMORY (BYTES): %llu, PATTERN (HEX): 0x%" PRIxPTR, NumBytesCPU, mem_pattern);
+        log_message(start_msg);
+    }
+    if (CheckGPU)
+    {
+        sprintf(start_msg, "INFO, ALLOCATED GPU MEMORY (BYTES): %llu, PATTERN (HEX): 0x%" PRIxPTR , NumBytesGPU, mem_pattern);
+        log_message(start_msg);
+    }
+
+    if (CheckCPU)
+        initialize_cpu_memory();
+    if (CheckGPU)
+        initialize_gpu_memory();
+
+    //
+    // The daemon loop.
+    //
+    memory_test_loop(RANDOM);
+
+    if (CheckCPU)
+        free_cpu_memory();
+    if (CheckGPU)
+        free_gpu_memory();
 }
 

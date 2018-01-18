@@ -36,7 +36,7 @@
  *      Author: Ferad Zyulkyarov <ferad.zyulkyzrov@bsc.es>
  */
 
-#include "../include/pmu.h"
+#include "pmu.h"
 #include <stdlib.h>
 #include <linux/perf_event.h>
 #include <syscall.h>

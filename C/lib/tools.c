@@ -1,16 +1,146 @@
-#include "../include/MemoryReliability_decl.h"
+#include <stdbool.h>
+#include <assert.h>
+#ifdef USE_CUDA
+#include <cuda_runtime.h>
+#include "MemoryReliability_decl.cuh"
+#endif
+#include "MemoryReliability_decl.h"
 
-void simple_memory_test(void* mem, unsigned int num_bytes)
+
+unsigned char* random_ptr_inside(unsigned char* start, unsigned long long size)
 {
-	unsigned int i = 1;
-	unsigned int word_ind = 0;
+    unsigned int ruibytes;
+    int ribytes = rand();
+    memcpy(&ruibytes, &ribytes, sizeof(ribytes)); // TODO check if a cast would do the same
+    ruibytes = ruibytes % size;
+    return start + ruibytes;
+}
 
-	ADDRVALUE expected_value;
-	ADDRVALUE* actual_value;
-	unsigned char int_size = sizeof(ADDRVALUE);
-	unsigned int num_words = num_bytes / int_size;
-	ADDRVALUE* buffer = NULL;
+unsigned char* align_to_addrvalue(unsigned char* ptr_data)
+{
+    uintptr_t ptrmask = sizeof(ADDRVALUE)-1;
+    return (unsigned char*) ((uintptr_t)ptr_data & ~ptrmask);
+}
 
+bool inject_dice_roll()
+{
+    int riter = rand()%10 + 1;
+    return riter == 5;
+}
+
+void inject_cpu_error(unsigned char* start, ADDRVALUE expected_value, Strategy_t s)
+{
+#ifdef INJECT_ERR
+    unsigned char *ptr_data = NULL;
+
+    if (inject_dice_roll()) { // FIXME the caller should decide when to inject
+        switch (s) {
+        case SIMPLE:
+            break;
+        case ZERO:
+            ptr_data = random_ptr_inside(start, NumBytesCPU);
+            memset(ptr_data, 0x1, 1);
+            // We print the ADDRVALUE-aligned address to match the error report
+            ptr_data = align_to_addrvalue(ptr_data);
+            break;
+        case RANDOM:
+            ptr_data = align_to_addrvalue(random_ptr_inside(start, NumBytesCPU));
+            *ptr_data = ~expected_value;
+            break;
+        default:
+            assert(false);
+        }
+
+        if (ptr_data != NULL) {
+            char msg[1000];
+            snprintf(msg,1000,"Inject error at %p (CPU)", ptr_data);
+            log_message(msg);
+        }
+    }
+#endif
+}
+
+void inject_gpu_error(unsigned char* start, ADDRVALUE expected_value, Strategy_t s)
+{
+#if defined(INJECT_ERR) && defined(USE_CUDA)
+    unsigned char *ptr_data = NULL;
+    cudaError_t err;
+
+    if (inject_dice_roll()) { // FIXME the caller should decide when to inject
+        switch (s) {
+        case SIMPLE:
+            break;
+        case ZERO:
+            ptr_data = random_ptr_inside(start, NumBytesGPU);
+            err = cudaMemset(ptr_data, 0x1, 1);
+            if (err != cudaSuccess)
+            {
+                char msg[255];
+                sprintf(msg, "ERROR,Cannot memset ptr_data to 0x1 (%s:%s).",
+                        cudaGetErrorName(err), cudaGetErrorString(err));
+                log_message(msg);
+            }
+            // We print the ADDRVALUE-aligned address to match the error report
+            ptr_data = align_to_addrvalue(ptr_data);
+            break;
+        case RANDOM:
+            ptr_data = align_to_addrvalue(random_ptr_inside(start, NumBytesGPU));
+            ADDRVALUE new_value = ~expected_value;
+            // TODO ask if correct; the CPU version writes one byte because dereferences a char*
+            err = cudaMemcpy(ptr_data, &new_value, 1, cudaMemcpyHostToDevice);
+            if (err != cudaSuccess)
+            {
+                char msg[255];
+                sprintf(msg, "ERROR,Cannot memcpy ptr_data to GPU (%s:%s).",
+                        cudaGetErrorName(err), cudaGetErrorString(err));
+                log_message(msg);
+            }
+            break;
+        default:
+            assert(false);
+        }
+
+        if (ptr_data != NULL) {
+            char msg[1000];
+            snprintf(msg,1000,"Inject error at %p (GPU)", ptr_data);
+            log_message(msg);
+        }
+    }
+#endif
+}
+
+bool check_cpu_mem(ADDRVALUE* buffer,
+                   unsigned long long num_bytes,
+                   ADDRVALUE expected_value,
+                   ADDRVALUE new_value)
+{
+    const long unsigned num_words = num_bytes / sizeof(ADDRVALUE);
+    for (long unsigned word = 0; word < num_words; word++)
+    {
+        ADDRVALUE actual_value = buffer[word];
+        if (actual_value != expected_value)
+        {
+            log_error(&buffer[word], actual_value, expected_value);
+        }
+
+        buffer[word] = new_value;
+    }
+    return true;
+}
+
+bool check_gpu_mem(ADDRVALUE* buffer,
+                   unsigned long long num_bytes,
+                   ADDRVALUE expected_value,
+                   ADDRVALUE new_value)
+{
+#if defined(USE_CUDA)
+    check_gpu_stub(buffer, num_bytes, expected_value, new_value);
+#endif
+    return true;
+}
+
+void simple_memory_test()
+{
 	//
 	// Start the HW counters for the LocalMemErrors
 	//
@@ -26,27 +156,17 @@ void simple_memory_test(void* mem, unsigned int num_bytes)
 		}
 	}
 
+    ADDRVALUE expected_value = 0;
+
 	//
 	// The main loop
 	//
 	while(ExitNow == 0)
 	{
-		buffer = (ADDRVALUE*)mem;
-		expected_value = i - 1;
+        check_cpu_mem(cpu_mem, NumBytesCPU, expected_value, expected_value+1);
+        check_gpu_mem(gpu_mem, NumBytesGPU, expected_value, expected_value+1);
 
-		for (word_ind = 0; word_ind < num_words; word_ind++)
-		{
-			actual_value = buffer;
-			if (*actual_value != expected_value)
-			{
-				log_error(actual_value, *actual_value, expected_value);
-			}
-			*actual_value = i;
-
-			buffer++;
-		}
-
-		i++;
+        expected_value++;
 
 		local_mem_errors = readLocalMemErrorsCounters();
 		log_local_mem_errors(local_mem_errors);
@@ -57,19 +177,12 @@ void simple_memory_test(void* mem, unsigned int num_bytes)
 		}
 	}
 
-	free(mem);
-
 	local_mem_errors = stopLocalMemErrorsCounters();
 	log_local_mem_errors(local_mem_errors);
 }
 
-void zero_one_test(void* mem, unsigned int num_bytes)
+void zero_one_test()
 {
-    ADDRVALUE expected_value = 0x0;
-    ADDRVALUE* word_ind = NULL;
-    unsigned char* startMem = (unsigned char*)mem;
-    unsigned char* endMem = startMem + num_bytes;
-
     //
     // Start the HW counters for the LocalMemErrors
     //
@@ -85,40 +198,21 @@ void zero_one_test(void* mem, unsigned int num_bytes)
         }
     }
 
+    ADDRVALUE expected_value = 0x0;
     //
     // The main loop
     //
     while(ExitNow == 0)
     {
-    
-    // 
-    // Simulate error at random position and random iteration.
-    //
-#ifdef INJECT_ERR
-        int riter = rand()%10 + 1;
-        if (riter == 5) {
-            unsigned int ruibytes;
-            int ribytes = rand();
-            memcpy(&ruibytes, &ribytes, sizeof(ribytes));
-            ruibytes = (ruibytes%num_bytes);
-            unsigned char *ptr_data = startMem + ruibytes;
-            memset(ptr_data, 0x1, 1);
-            uintptr_t ptrmask = sizeof(uintptr_t)-1;
-            ptr_data = (unsigned char*) ((uintptr_t)ptr_data & ~ptrmask); 
-            char msg[1000];
-            snprintf(msg,1000,"Inject error at %p", ptr_data);
-            log_message(msg);
-        }
-#endif
-        
-        for (word_ind = (ADDRVALUE*)startMem; word_ind < (ADDRVALUE*)endMem; word_ind++)
-        {
-           if (*word_ind != expected_value)
-           {
-               log_error(word_ind, *word_ind, expected_value);
-           }
-           *word_ind = ~expected_value;
-        }
+        //
+        // Simulate error at random position and random iteration.
+        //
+        inject_cpu_error(cpu_mem, expected_value, ZERO);
+        inject_gpu_error(gpu_mem, expected_value, ZERO);
+
+        check_cpu_mem(cpu_mem, NumBytesCPU, expected_value, ~expected_value);
+        check_gpu_mem(gpu_mem, NumBytesGPU, expected_value, ~expected_value);
+
         expected_value = ~expected_value;
 
         local_mem_errors = readLocalMemErrorsCounters();
@@ -130,19 +224,12 @@ void zero_one_test(void* mem, unsigned int num_bytes)
         }
     }
 
-    free(mem);
-
     local_mem_errors = stopLocalMemErrorsCounters();
     log_local_mem_errors(local_mem_errors);
 }
 
-void random_pattern_test(void* mem, unsigned int num_bytes)
+void random_pattern_test()
 {
-    ADDRVALUE expected_value;
-    ADDRVALUE* word_ind = NULL;
-    unsigned char* startMem = (unsigned char*)mem;
-    unsigned char* endMem = startMem + num_bytes;
-
     //
     // Start the HW counters for the LocalMemErrors
     //
@@ -158,42 +245,44 @@ void random_pattern_test(void* mem, unsigned int num_bytes)
         //}
     }
 
+    ADDRVALUE expected_value;
     memset(&expected_value, mem_pattern, sizeof(uint64_t));
-    memset(mem, mem_pattern, num_bytes);
-    
+    if (CheckCPU)
+    {
+        memset(cpu_mem, mem_pattern, NumBytesCPU);
+    }
+#if defined(INJECT_ERR) && defined(USE_CUDA)
+    if (CheckGPU)
+    {
+        cudaError_t err = cudaMemset(gpu_mem, mem_pattern, NumBytesGPU);
+        if (err != cudaSuccess)
+        {
+            char msg[255];
+            sprintf(msg, "ERROR,Cannot memset ptr_data to 0x1 (%s:%s).",
+                         cudaGetErrorName(err), cudaGetErrorString(err));
+            log_message(msg);
+        }
+    }
+#endif
+
     //
     // The main loop
     //
-    while(ExitNow == 0)
+    while (ExitNow == 0)
     {
         // 
         // Simulate error at random position and random iteration.
         //
-#ifdef INJECT_ERR
-        int riter = rand()%10 + 1;
-        if (riter == 5) {
-            unsigned int ruibytes;
-            int ribytes = rand();
-            memcpy(&ruibytes, &ribytes, sizeof(ribytes));
-            ruibytes = (ruibytes%num_bytes);
-            unsigned char *ptr_data = startMem + ruibytes;
-            uintptr_t ptrmask = sizeof(uintptr_t)-1;
-            ptr_data = (unsigned char*) ((uintptr_t)ptr_data & ~ptrmask); 
-            *ptr_data = ~expected_value;
-            char msg[1000];
-            snprintf(msg,1000,"Inject error at %p", ptr_data);
-            log_message(msg);
-        }
-#endif
-        
-        for (word_ind = (ADDRVALUE*)startMem; word_ind < (ADDRVALUE*)endMem; word_ind++)
-        {
-           if (*word_ind != expected_value)
-           {
-               log_error(word_ind, *word_ind, expected_value);
-           }
-           *word_ind = ~expected_value;
-        }
+        if (CheckCPU)
+            inject_cpu_error(cpu_mem, expected_value, RANDOM);
+        if (CheckGPU)
+            inject_gpu_error(gpu_mem, expected_value, RANDOM);
+
+        if (CheckCPU)
+            check_cpu_mem(cpu_mem, NumBytesCPU, expected_value, ~expected_value);
+        if (CheckGPU)
+            check_gpu_mem(gpu_mem, NumBytesGPU, expected_value, ~expected_value);
+
         expected_value = ~expected_value;
 
         local_mem_errors = readLocalMemErrorsCounters();
@@ -205,11 +294,27 @@ void random_pattern_test(void* mem, unsigned int num_bytes)
         }
     }
 
-    free(mem);
-
     local_mem_errors = stopLocalMemErrorsCounters();
     log_local_mem_errors(local_mem_errors);
 }
+
+void memory_test_loop(Strategy_t type)
+{
+    switch (type) {
+    case SIMPLE:
+        simple_memory_test();
+        break;
+    case ZERO:
+        zero_one_test();
+        break;
+    case RANDOM:
+        random_pattern_test();
+        break;
+    default:
+        assert(false);
+    }
+}
+
 void check_no_daemon_running()
 {
 	pid_t pid = daemon_pid_read_from_file();
@@ -219,30 +324,93 @@ void check_no_daemon_running()
 		exit(EXIT_FAILURE);
 	}
 }
-void initialize_memory()
-{
-	while(!Mem && NumBytes > MEGA)
-	{
-		Mem = malloc(NumBytes);
-		if (!Mem)
-		{
-			NumBytes -= MEGA*10;
-		}
-	}
 
-	if (!Mem)
-	{
-		char msg[255];
-		sprintf(msg, "ERROR_INFO,Cannot allocate %llu number of bytes.", NumBytes);
-		log_message(msg);
-		sleep(2);
-		if (daemon_pid_file_exists())
-		{
-			daemon_pid_delete_file();
-		}
-		exit(EXIT_FAILURE);
-	}
-    memset(Mem, 0x0, NumBytes);
+bool is_initialized(void* ptr)
+{
+    return ptr != NULL;
+}
+
+void initialize_cpu_memory()
+{
+    if (!is_initialized(cpu_mem))
+    {
+        cpu_mem = malloc(NumBytesCPU);
+        if (cpu_mem == NULL)
+        {
+            char msg[255];
+            sprintf(msg, "ERROR_INFO,Cannot allocate %llu number of CPU memory.", NumBytesCPU);
+            log_message(msg);
+            sleep(2);
+            if (daemon_pid_file_exists())
+            {
+                daemon_pid_delete_file();
+            }
+            exit(EXIT_FAILURE);
+        }
+        memset(cpu_mem, 0x0, NumBytesCPU);
+    }
+}
+
+void initialize_gpu_memory()
+{
+#ifdef USE_CUDA
+    if (is_initialized(gpu_mem)) return;
+
+    cudaError_t err;
+    err = cudaMalloc(&gpu_mem, NumBytesGPU);
+    if (err != cudaSuccess)
+    {
+        char msg[255];
+        sprintf(msg, "ERROR_INFO,Cannot allocate %llu bytes of GPU memory (%s:%s).",
+                NumBytesGPU, cudaGetErrorName(err), cudaGetErrorString(err));
+        log_message(msg);
+    } else {
+        err = cudaMemset(gpu_mem, 0x0, NumBytesGPU);
+        if (err != cudaSuccess)
+        {
+            char msg[255];
+            sprintf(msg, "ERROR_INFO,Cannot memset %llu bytes of GPU memory (%s:%s).",
+                    NumBytesGPU, cudaGetErrorName(err), cudaGetErrorString(err));
+            log_message(msg);
+        }
+    }
+
+    if (err != cudaSuccess) {
+        sleep(2);
+        if (daemon_pid_file_exists())
+        {
+            daemon_pid_delete_file();
+        }
+        exit(EXIT_FAILURE);
+    }
+#endif
+}
+
+void free_cpu_memory()
+{
+    free(cpu_mem);
+}
+
+void free_gpu_memory()
+{
+#ifdef USE_CUDA
+    cudaError_t err;
+    err = cudaFree(gpu_mem);
+    if (err != cudaSuccess)
+    {
+        char msg[255];
+        sprintf(msg, "ERROR_INFO,Cannot free GPU memory (%s:%s).",
+                    cudaGetErrorName(err), cudaGetErrorString(err));
+        log_message(msg);
+
+        sleep(2);
+        if (daemon_pid_file_exists())
+        {
+            daemon_pid_delete_file();
+        }
+        exit(EXIT_FAILURE);
+    }
+#endif
 }
 
 void sigterm_signal_handler(int signum)
@@ -250,21 +418,14 @@ void sigterm_signal_handler(int signum)
 	ExitNow = 1;
 	log_message("STOP,SIGTERM");
 }
+
 void sigint_signal_handler(int signum)
 {
 	ExitNow = 1;
 	log_message("STOP,SIGINT");
 }
 
-time_t get_formatted_timestamp(char* out_time_formatted, unsigned char num_bytes)
-{
-	time_t rawtime;
-	struct tm *info;
-	time(&rawtime);
-	info = localtime(&rawtime);
-	strftime(out_time_formatted, num_bytes, "%x - %H:%M:%S", info);
-	return rawtime;
-}
+
 
 void daemon_pid_write_to_file(pid_t pid)
 {
@@ -320,46 +481,6 @@ void daemon_pid_delete_file()
 	}
 }
 
-int read_temperature()
-{
-    int fd, fd_err, core = 0, ierr;
-    uint64_t temp;
-    char msr_file[32];
-    memset(msr_file, 0, 32);
 
-#ifdef SYS_getcpu
-    if (syscall(SYS_getcpu, &core, NULL, NULL) < 0) {
-        core = 0;
-    }
-#endif
-    
-    fd_err = open(ErrFile, O_WRONLY|O_CREAT|O_APPEND, 0666);
-    
-    snprintf(msr_file, 31, "/dev/cpu/%u/msr", core);
-    fd = open(msr_file, O_RDONLY);
-    if (fd == -1) {
-        ierr = errno;
-        dprintf(fd_err, "could not OPEN msr file: %s\n", strerror(ierr));
-        ierr = 0;
-        return -1;
-    }
-    
-    ierr = pread(fd, &temp, sizeof(temp), TEMP_FIELD_OFFSET);
-    if (ierr == -1) {
-        ierr = errno;
-        dprintf(fd_err, "could not READ msr file: %s\n", strerror(ierr));
-        ierr = 0;
-        return -1;
-    }
-
-    temp &= TEMP_FIELD_MASK;
-    temp >>= TEMP_FIELD_LOW_BIT;
-    temp = TCC_ACT_TEMP - temp;
-
-    close(fd_err);
-    close(fd);
-
-	return temp;
-}
 
 

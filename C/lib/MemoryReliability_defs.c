@@ -1,4 +1,4 @@
-#include "../include/MemoryReliability_decl.h"
+#include "MemoryReliability_decl.h"
 
 // DEFINITIONS
 const unsigned int TCC_ACT_TEMP         = 100; // TCC activation temperature
@@ -23,6 +23,6 @@ unsigned long long NumBytes = 0;
 void* Mem = NULL;
 
 unsigned int SleepTime = 0;
-unsigned char ExitNow = 0;
-unsigned char IsDaemonStart = 0;
-unsigned char IsDaemonStop = 0;
+bool ExitNow = false;
+bool IsDaemonStart = false;
+bool IsDaemonStop = false;
