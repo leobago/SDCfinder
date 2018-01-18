@@ -19,7 +19,8 @@ char ErrFile[255] = "MemoryReliability.err";
 unsigned int WarningRate = 0;
 unsigned int NumErrors = 0;
 
-unsigned long long NumBytes = 0;
+unsigned long long NumBytesCPU = 0;
+unsigned long long numBytesGPU = 0;
 void* Mem = NULL;
 
 unsigned int SleepTime = 0;

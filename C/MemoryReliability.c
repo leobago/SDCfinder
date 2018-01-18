@@ -130,34 +130,26 @@ bool parse_arguments(int argc, char* argv[])
 		{
 			IsDaemonStart = 1;
 		}
-        if (strcmp(argv[i], "--cpu") == 0)
+        if (strcmp(argv[i], "-m") == 0)
         {
             i++;
             CheckCPU = 1;
 
-            if (strcmp(argv[i], "-m") == 0)
-            {
-                i++;
-                unsigned int mega = (unsigned int)atoi(argv[i]);
-                NumBytesCPU = (unsigned long long)mega * (unsigned long long)MEGA;
-                if (NumBytesCPU%8 != 0) {
-                    printf("The number of Bytes has to be a multiple of 8");
-                }
+            unsigned int mega = (unsigned int)atoi(argv[i]);
+            NumBytesCPU = (unsigned long long)mega * (unsigned long long)MEGA;
+            if (NumBytesCPU%8 != 0) {
+                printf("The number of Bytes has to be a multiple of 8");
             }
         }
-        if (strcmp(argv[i], "--gpu") == 0)
+        if (strcmp(argv[i], "-g") == 0)
         {
             i++;
             CheckGPU = 1;
 
-            if (strcmp(argv[i], "-m") == 0)
-            {
-                i++;
-                unsigned int mega = (unsigned int)atoi(argv[i]);
-                NumBytesGPU = (unsigned long long)mega * (unsigned long long)MEGA;
-                if (NumBytesGPU%8 != 0) {
-                    printf("The number of Bytes has to be a multiple of 8");
-                }
+            unsigned int mega = (unsigned int)atoi(argv[i]);
+            NumBytesGPU = (unsigned long long)mega * (unsigned long long)MEGA;
+            if (NumBytesGPU%8 != 0) {
+                printf("The number of Bytes has to be a multiple of 8");
             }
         }
 		if (strcmp(argv[i], "-o") == 0)
@@ -221,26 +213,24 @@ void print_usage(char* program_name)
 {
 	printf("Memory scanner by Ferad Zyulkyarov\n");
 	printf("This program starts a daemon for memory test or stops an already running daemon.\n");
-	printf("Options: [-d] [-c] [--cpu [-m]] [--gpu [-m]] [-o] [-s] [-wn] [-wf]\n");
+	printf("Options: [-d] [-c] [-m] [-g] [-o] [-s] [-wn] [-wf]\n");
 	printf("    -d: start as daemon. If not passed will start as a foreground process.\n");
 	printf("    -c: stop the daemon.\n");
-    printf("    --cpu: check CPU memory.\n");
-    printf("    -m: the size of the CPU memory to test in MB.\n");
-    printf("    --gpu: check GPU memory.\n");
-    printf("    -m: the size of the GPU memory to test in MB.\n");
+    printf("    -m: the size of the CPU memory to test in MB. (enables CPU checks)\n");
+    printf("    -g: the size of the GPU memory to test in MB. (enables GPU checks)\n");
 	printf("    -o: log file name [default=%s].\n", OutFile);
 	printf("    -e: error file name [default=%s].\n", ErrFile);
 	printf("    -s: sleep time in seconds [default=%u].\n", SleepTime);
 	printf("    -wn: warning rate [default=%u].\n", WarningRate);
 	printf("    -wf: warning file [default=%s].\n", WarningFile);
 	printf("Example to start a daemon:\n");
-	printf("    %s -d --cpu -m 1024 -s 10 -o full_path_to_logfile.log -- run as a daemon, test 1024MB of CPU memory, and sleep for 10sec, write logs to logfile.log.\n", program_name);
-	printf("    %s -d --cpu -m 1024 -s 10 -o full_path_to_logfile.log -wn 15 -wf full_path_to_warningfile.txt -- run as a daemon, test 1024MB of CPU memory, and sleep for 10sec, write logs to logfile.log, if there are more than (-wn) 10 errors detected write the name of the host to file warning.txt\n", program_name);
-    printf("    %s -d --cpu -m 1024 --gpu -m 2048 -s 5 -o full_path_to_logfile.log -wn 15 -wf full_path_to_warningfile.txt -- run as a daemon, test 1024MB of CPU memory, test 2048MB of GPU memory, and sleep for 5sec, write logs to logfile.log, if there are more than (-wn) 10 errors detected write the name of the host to file warning.txt\n", program_name);
+	printf("    %s -d -m 1024 -s 10 -o full_path_to_logfile.log -- run as a daemon, test 1024MB of CPU memory, and sleep for 10sec, write logs to logfile.log.\n", program_name);
+	printf("    %s -d -m 1024 -s 10 -o full_path_to_logfile.log -wn 15 -wf full_path_to_warningfile.txt -- run as a daemon, test 1024MB of CPU memory, and sleep for 10sec, write logs to logfile.log, if there are more than (-wn) 10 errors detected write the name of the host to file warning.txt\n", program_name);
+    printf("    %s -d -m 1024 -g 2048 -s 5 -o full_path_to_logfile.log -wn 15 -wf full_path_to_warningfile.txt -- run as a daemon, test 1024MB of CPU memory, test 2048MB of GPU memory, and sleep for 5sec, write logs to logfile.log, if there are more than (-wn) 10 errors detected write the name of the host to file warning.txt\n", program_name);
     printf("Example to stop a daemon: \n");
 	printf("    %s -c\n", program_name);
 	printf("Example to run as a foreground process:\n");
-	printf("    %s --cpu -m 1024 -s 10 -- run as a daemon, test 1024MB of memory, and sleep for 10sec.\n", program_name);
+	printf("    %s -m 1024 -s 10 -- run as a daemon, test 1024MB of CPU memory, and sleep for 10sec.\n", program_name);
 }
 
 void start_daemon()
