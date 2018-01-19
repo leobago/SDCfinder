@@ -30,26 +30,27 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ============================================================================
-
-Filename    : logging.h
-Authors     : Ferad Zyulkyarov, Kai Keller, Pau Farré, Leonardo Bautista-Gomez
-Version     :
-Copyright   :
-Description : A daemon which tests the memory for errors.
-
-Header file for logging.h
 */
+
+/** \file   logging.h
+ *  \author Ferad Zyulkyarov
+ *  \author Kai Keller
+ *  \author Pau Farré
+ *  \author Leonardo Bautista-Gomez
+ *  \brief  header file for logging.c
+ */
 
 #ifndef LOGGING_H
 #define LOGGING_H
 
 #include "MemoryReliability_decl.h"
 
-extern const unsigned int TCC_ACT_TEMP;//         = 100; // TCC activation temperature
-extern const unsigned int TEMP_FIELD_LOW_BIT;//   = 16; // low bit of 6 bit temp value
-extern const unsigned int TEMP_FIELD_OFFSET;//    = 412; // offset in /dev/cpu/#cpu/msr file
-extern uint64_t TEMP_FIELD_MASK;//                = 0x00000000003f0000; // selects 6 bit field[22:16]
+extern const unsigned int TCC_ACT_TEMP;             /**< TCC activation temperature (=100)                  */
+extern const unsigned int TEMP_FIELD_LOW_BIT;       /**< low bit of 6 bit temp value (=16)                  */
+extern const unsigned int TEMP_FIELD_OFFSET;        /**< offset in /dev/cpu/#cpu/msr file (=412)            */
+extern uint64_t TEMP_FIELD_MASK;                    /**< selects 6 bit field[22:16] (=0x00000000003f0000    */
 
+/*! \brief Warns if amount of errors exceed a certain value TODO */
 void warn_for_errors();
 
 #endif //LOGGING_H

@@ -30,33 +30,35 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ============================================================================
-
-Filename    : MemoryReliability.c
-Authors     : Ferad Zyulkyarov, Kai Keller, Pau Farré, Leonardo Bautista-Gomez
-Version     :
-Copyright   :
-Description : A daemon which tests the memory for errors.
-
-This file implements a simple memory test tool which can run as foreground
-process or as a daemon.
-
-The executable can be used to:
-1) Start daemon
-2) Stop daemon
-3) Start foreground process
-
-Before starting a process as a daemon we first check if the daemon pid file
-exists and contains a valid value. The pid file name is stored in
-PidFileName. If such file exists we do not create a new daemon and print
-an error message.
-
-The client also intercepts and handles the SIGTERM signal and exists gently
-when such signal is received.
-
-============================================================================
-Adaptation for Intel architectures, Oct 2017.
-============================================================================
 */
+
+/** \file   MemoryReliability.c
+ *  \author Ferad Zyulkyarov
+ *  \author Kai Keller
+ *  \author Pau Farré
+ *  \author Leonardo Bautista-Gomez
+ *  \brief  Source for executable with main function
+ * 
+ *  This file implements a simple memory test tool which can run as foreground
+ *  process or as a daemon.             <br>
+ *                                      <br>
+ *  The executable can be used to:      <br>
+ *  1) Start daemon                     <br>        
+ *  2) Stop daemon                      <br>                    
+ *  3) Start foreground process         <br>                                    
+ *                                      <br> 
+ *  Before starting a process as a daemon we first check if the daemon pid file
+ *  exists and contains a valid value. The pid file name is stored in
+ *  PidFileName. If such file exists we do not create a new daemon and print
+ *  an error message                    <br>
+ *                                      <br>
+ *  The client also intercepts and handles the SIGTERM signal and exists gently
+ *  when such signal is received        <br>
+ *                                      <br>
+ *  ============================================================================<br>
+ *  Adaptation for Intel architectures, Oct 2017[]                              <br>
+ *  ============================================================================<br>
+**/
 
 #include "MemoryReliability_decl.h"
 
@@ -97,6 +99,7 @@ int main(int argc, char* argv[])
    +===========================================================================+
    */
 
+//! [start_daemon]
 void start_daemon()
 {
     char start_msg[255];
@@ -186,6 +189,7 @@ void start_daemon()
 
     exit(EXIT_SUCCESS);
 }
+//! [start_daemon]
 
 /*
    +===========================================================================+
@@ -193,6 +197,7 @@ void start_daemon()
    +===========================================================================+
    */
 
+//! [stop_daemon]
 void stop_daemon()
 {
     pid_t pid = daemon_pid_read_from_file();
@@ -219,6 +224,7 @@ void stop_daemon()
         }
     }
 }
+//! [stop_daemon]
 
 /*
    +===========================================================================+
@@ -226,6 +232,7 @@ void stop_daemon()
    +===========================================================================+
    */
 
+//! [start_client]
 void start_client()
 {
     char start_msg[255];
@@ -270,6 +277,7 @@ void start_client()
     if (CheckGPU)
         free_gpu_memory();
 }
+//! [start_client]
 
 /*
    +===========================================================================+
@@ -277,6 +285,7 @@ void start_client()
    +===========================================================================+
    */
 
+//! [parse_arguments]
 bool parse_arguments(int argc, char* argv[])
 {
     int i = 1, c;
@@ -427,6 +436,7 @@ bool parse_arguments(int argc, char* argv[])
 
     return is_success;
 }
+//! [parse_arguments]
 
 /*
    +===========================================================================+
@@ -434,6 +444,7 @@ bool parse_arguments(int argc, char* argv[])
    +===========================================================================+
    */
 
+//! [print_usage]
 void print_usage(char* program_name)
 {
     printf(
@@ -466,3 +477,4 @@ void print_usage(char* program_name)
             "    %s --cpu -m 1024 -s 10 -- run as a daemon, test 1024MB of memory, and sleep for 10sec.\n",
         program_name,OutFile, ErrFile, SleepTime, WarnFile, WarnRate, program_name, program_name, program_name, program_name, program_name);
 }
+//! [print_usage]

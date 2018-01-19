@@ -30,26 +30,24 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ============================================================================
-
-Filename    : tools.c
-Authors     : Ferad Zyulkyarov, Kai Keller, Pau Farré, Leonardo Bautista-Gomez
-Version     :
-Copyright   :
-Description : A daemon which tests the memory for errors.
-
-This file provides helper functions.
 */
 
-// TODO
-// 
-// the msr register name for ECC is IA32_MCi_STATUS. Explanations of the 
-// fields are given in Intel® 64 and IA-32 Architectures Software 
-// Developer’s Manual, Volume 3B: System Programming Guide, Part 2 in 
-// chapter 15.3.2.1 (page 48 in the pdf). Position in msr file (in hex) 
-// is 424H and for IA32_MC9_STATUS, where "Banks MC9 through MC 16 report 
-// MC error from each channel of the integrated memory controllers."
-//
-// In the registers are also ecc counter.
+/** \file   tools.c
+ *  \author Ferad Zyulkyarov
+ *  \author Kai Keller
+ *  \author Pau Farré
+ *  \author Leonardo Bautista-Gomez
+ *  \brief  provides helper functions.
+ *  
+ *  \todo the msr register name for ECC is IA32_MCi_STATUS. Explanations of the 
+ *  fields are given in Intel® 64 and IA-32 Architectures Software 
+ *  Developer’s Manual, Volume 3B: System Programming Guide, Part 2 in 
+ *  chapter 15.3.2.1 (page 48 in the pdf). Position in msr file (in hex) 
+ *  is 424H and for IA32_MC9_STATUS, where "Banks MC9 through MC 16 report 
+ *  MC error from each channel of the integrated memory controllers." <br><br>
+ *  In the registers are also ecc counter.
+ */
+
 
 #include "MemoryReliability_decl.h"
 
@@ -58,6 +56,7 @@ bool is_initialized(void* ptr)
     return ptr != NULL;
 }
 
+//! \internal [initialize_cpu_memory]
 void initialize_cpu_memory()
 {
     if (!is_initialized(cpu_mem))
@@ -78,7 +77,9 @@ void initialize_cpu_memory()
         memset(cpu_mem, 0x0, NumBytesCPU);
     }
 }
+//! \internal [initialize_cpu_memory]
 
+//! \internal [initialize_gpu_memory]
 void initialize_gpu_memory()
 {
 #ifdef USE_CUDA
@@ -113,12 +114,16 @@ void initialize_gpu_memory()
     }
 #endif
 }
+//! \internal [initialize_gpu_memory]
 
+//! \internal [free_cpu_memory]
 void free_cpu_memory()
 {
     free(cpu_mem);
 }
+//! \internal [free_cpu_memory]
 
+//! \internal [free_gpu_memory]
 void free_gpu_memory()
 {
 #ifdef USE_CUDA
@@ -140,4 +145,5 @@ void free_gpu_memory()
     }
 #endif
 }
+//! \internal [free_gpu_memory]
 

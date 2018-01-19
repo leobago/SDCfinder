@@ -30,15 +30,15 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ============================================================================
-
-Filename    : logging.c
-Authors     : Ferad Zyulkyarov, Kai Keller, Pau Farré, Leonardo Bautista-Gomez
-Version     :
-Copyright   :
-Description : A daemon which tests the memory for errors.
-
-This file provides functions for debug, message, even and error logging.
 */
+
+/** \file   logging.c
+ *  \author Ferad Zyulkyarov
+ *  \author Kai Keller
+ *  \author Pau Farré
+ *  \author Leonardo Bautista-Gomez
+ *  \brief  Provides functions debug, message, even and error logging.
+ */
 
 #include "logging.h"
 
@@ -84,6 +84,7 @@ int read_temperature()
     return temp;
 }
 
+//! \internal [get_formatted_timestamp]
 time_t get_formatted_timestamp(char* out_time_formatted, unsigned char num_bytes)
 {
     time_t rawtime;
@@ -93,6 +94,7 @@ time_t get_formatted_timestamp(char* out_time_formatted, unsigned char num_bytes
     strftime(out_time_formatted, num_bytes, "%x - %H:%M:%S", info);
     return rawtime;
 }
+//! \internal [get_formatted_timestamp]
 
 void warn_for_errors()
 {
@@ -104,6 +106,7 @@ void warn_for_errors()
 	}
 }
 
+//! \internal [log_error]
 void log_error(void* address, ADDRVALUE actual_value, ADDRVALUE expected_value)
 {
 	char time_str[255];
@@ -131,7 +134,9 @@ void log_error(void* address, ADDRVALUE actual_value, ADDRVALUE expected_value)
 		warn_for_errors();
 	}
 }
+//! \internal [log_error]
 
+//! \internal [log_message]
 void log_message(char* message)
 {
 	char time_str[255];
@@ -149,3 +154,4 @@ void log_message(char* message)
 	fprintf(f, "%s,%lld,%s,%s,%d\n", time_str, (long long int)time, message, HostName, temperature);
 	fclose(f);
 }
+//! \internal [log_message]

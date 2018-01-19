@@ -30,15 +30,15 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ============================================================================
-
-Filename    : MemoryReliability_defs.c
-Authors     : Ferad Zyulkyarov, Kai Keller, Pau Farré, Leonardo Bautista-Gomez
-Version     :
-Copyright   :
-Description : A daemon which tests the memory for errors.
-
-This file provides constants and static variables initialization.
 */
+
+/** \file   MemoryReliability_defs.c
+ *  \author Ferad Zyulkyarov
+ *  \author Kai Keller
+ *  \author Pau Farré
+ *  \author Leonardo Bautista-Gomez
+ *  \brief  provides constants and static variables initialization.
+ */
 
 #include "MemoryReliability_decl.h"
 

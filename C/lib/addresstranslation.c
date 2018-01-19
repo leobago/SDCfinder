@@ -30,19 +30,18 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ============================================================================
-
-Filename    : addresstranslation.c
-Authors     : Ferad Zyulkyarov, Kai Keller, Pau Farré, Leonardo Bautista-Gomez
-Version     :
-Copyright   :
-Description : A daemon which tests the memory for errors.
-
-This file provides a function to translate a virtual address to the physical
-address.
 */
 
-#include "addresstranslation.h"
+/** \file   addresstranslation.c
+ *  \author Ferad Zyulkyarov
+ *  \author Kai Keller
+ *  \author Pau Farré
+ *  \author Leonardo Bautista-Gomez
+ *  \brief  Contains a function to translate virtual to physical addresses
+ */
 
+#include "addresstranslation.h"
+//! \internal [virtual_to_physical_address]
 uintptr_t virtual_to_physical_address(uintptr_t virt_addr) {
 
     uintptr_t vpfn = 0; // virtual page frame number
@@ -150,3 +149,4 @@ uintptr_t virtual_to_physical_address(uintptr_t virt_addr) {
 
     return phys_addr;
 }
+//! \internal [virtual_to_physical_address]
