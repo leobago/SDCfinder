@@ -50,16 +50,6 @@ exists and contains a valid value. The pid file name is stored in
 PidFileName. If such file exists we do not create a new daemon and print
 an error message.
 
-If the pid file does not exist, we create one and store in it the pid of the
-daemon process. Then we initialize the memory and run the daemon.
-
-The daemon scans the memory for errors and logs the error if it finds one.
-
-The daemon stops when it receives a SIGTERM signal that can be send either
-by calling "kill daemon_pid" or calling this executable with the "-c"
-argument. In the latter case, we read the pid of the daemon from the
-pid file, send the SIGTERM signal and delete the pid file.
-
 The client also intercepts and handles the SIGTERM signal and exists gently
 when such signal is received.
 
