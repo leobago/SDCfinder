@@ -32,7 +32,7 @@
  ============================================================================
 */
 
-/** \file   addresstranslation.h
+/*! \file   addresstranslation.h
  *  \author Ferad Zyulkyarov
  *  \author Kai Keller
  *  \author Pau Farré
@@ -81,9 +81,6 @@
  *  This macro returns the offset to the page frame of the virtual-address value
  * */
 #define GET_OFFSET(X) X & ( PAGE_SIZE -1 )
-
-/*! security measure to prevent infinite loop execution */
-#define MAX_ITER 1000
 
 /*! file containing the page table (mapping virtual address -> physical address) */
 #define page_mapping_file "/proc/self/pagemap"

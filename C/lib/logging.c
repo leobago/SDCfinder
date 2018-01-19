@@ -149,24 +149,3 @@ void log_message(char* message)
 	fprintf(f, "%s,%lld,%s,%s,%d\n", time_str, (long long int)time, message, HostName, temperature);
 	fclose(f);
 }
-
-void log_local_mem_errors(int local_mem_errors)
-{
-	if (local_mem_errors != 0)
-	{
-		if (local_mem_errors < 0)
-		{
-			char err_msg[255] = "ERROR_INFO,Cannot read MemLocalErrs counter.";
-			log_message(err_msg);
-		}
-
-		if (local_mem_errors > 0)
-		{
-			char err_msg[255];
-			memset(err_msg, 0, 255);
-			sprintf(err_msg, "ERROR_MEM_LOCAL,%d", local_mem_errors);
-			log_message(err_msg);
-		}
-	}
-}
-

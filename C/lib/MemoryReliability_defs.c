@@ -55,6 +55,18 @@ uint64_t            TEMP_FIELD_MASK     = 0x00000000003f0000;       // selects 6
 const unsigned int  KILO                = 1024;                     // KB factor
 const unsigned int  MEGA                = 1048576;                  // MB factor
 const unsigned int  GIGA                = 1073741824;               // GB factor
+const unsigned int  MAX_ITER            = 1000;
+
+char                HostName[255]       = "";
+
+unsigned long long  NumBytesCPU         = 0; 
+unsigned long long  NumBytesGPU         = 0;  
+void*               cpu_mem             = NULL;
+void*               gpu_mem             = NULL;
+
+unsigned char       mem_pattern         = '\0';
+bool                CheckCPU            = true;
+bool                CheckGPU            = false;
 
 /*
    +===========================================================================+
