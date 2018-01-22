@@ -1,335 +1,62 @@
-#include <stdbool.h>
-#include <assert.h>
-#ifdef USE_CUDA
-#include <cuda_runtime.h>
-#include "MemoryReliability_decl.cuh"
-#endif
+/*
+ *
+ * BSD 3-Clause License
+ *
+ * Copyright (c) 2017, Leo
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ *
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ *
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ ============================================================================
+*/
+
+/** \file   tools.c
+ *  \author Ferad Zyulkyarov
+ *  \author Kai Keller
+ *  \author Pau Farré
+ *  \author Leonardo Bautista-Gomez
+ *  \brief  provides helper functions.
+ *  
+ *  \todo the msr register name for ECC is IA32_MCi_STATUS. Explanations of the 
+ *  fields are given in Intel® 64 and IA-32 Architectures Software 
+ *  Developer’s Manual, Volume 3B: System Programming Guide, Part 2 in 
+ *  chapter 15.3.2.1 (page 48 in the pdf). Position in msr file (in hex) 
+ *  is 424H and for IA32_MC9_STATUS, where "Banks MC9 through MC 16 report 
+ *  MC error from each channel of the integrated memory controllers." <br><br>
+ *  In the registers are also ecc counter.
+ */
+
+
 #include "MemoryReliability_decl.h"
-
-
-unsigned char* random_ptr_inside(unsigned char* start, unsigned long long size)
-{
-    unsigned int ruibytes;
-    int ribytes = rand();
-    memcpy(&ruibytes, &ribytes, sizeof(ribytes)); // TODO check if a cast would do the same
-    ruibytes = ruibytes % size;
-    return start + ruibytes;
-}
-
-unsigned char* align_to_addrvalue(unsigned char* ptr_data)
-{
-    uintptr_t ptrmask = sizeof(ADDRVALUE)-1;
-    return (unsigned char*) ((uintptr_t)ptr_data & ~ptrmask);
-}
-
-bool inject_dice_roll()
-{
-    int riter = rand()%10 + 1;
-    return riter == 5;
-}
-
-void inject_cpu_error(unsigned char* start, ADDRVALUE expected_value, Strategy_t s)
-{
-#ifdef INJECT_ERR
-    unsigned char *ptr_data = NULL;
-
-    if (inject_dice_roll()) { // FIXME the caller should decide when to inject
-        switch (s) {
-        case SIMPLE:
-            break;
-        case ZERO:
-            ptr_data = random_ptr_inside(start, NumBytesCPU);
-            memset(ptr_data, 0x1, 1);
-            // We print the ADDRVALUE-aligned address to match the error report
-            ptr_data = align_to_addrvalue(ptr_data);
-            break;
-        case RANDOM:
-            ptr_data = align_to_addrvalue(random_ptr_inside(start, NumBytesCPU));
-            *ptr_data = ~expected_value;
-            break;
-        default:
-            assert(false);
-        }
-
-        if (ptr_data != NULL) {
-            char msg[1000];
-            snprintf(msg,1000,"Inject error at %p (CPU)", ptr_data);
-            log_message(msg);
-        }
-    }
-#endif
-}
-
-void inject_gpu_error(unsigned char* start, ADDRVALUE expected_value, Strategy_t s)
-{
-#if defined(INJECT_ERR) && defined(USE_CUDA)
-    unsigned char *ptr_data = NULL;
-    cudaError_t err;
-
-    if (inject_dice_roll()) { // FIXME the caller should decide when to inject
-        switch (s) {
-        case SIMPLE:
-            break;
-        case ZERO:
-            ptr_data = random_ptr_inside(start, NumBytesGPU);
-            err = cudaMemset(ptr_data, 0x1, 1);
-            if (err != cudaSuccess)
-            {
-                char msg[255];
-                sprintf(msg, "ERROR,Cannot memset ptr_data to 0x1 (%s:%s).",
-                        cudaGetErrorName(err), cudaGetErrorString(err));
-                log_message(msg);
-            }
-            // We print the ADDRVALUE-aligned address to match the error report
-            ptr_data = align_to_addrvalue(ptr_data);
-            break;
-        case RANDOM:
-            ptr_data = align_to_addrvalue(random_ptr_inside(start, NumBytesGPU));
-            ADDRVALUE new_value = ~expected_value;
-            // TODO ask if correct; the CPU version writes one byte because dereferences a char*
-            err = cudaMemcpy(ptr_data, &new_value, 1, cudaMemcpyHostToDevice);
-            if (err != cudaSuccess)
-            {
-                char msg[255];
-                sprintf(msg, "ERROR,Cannot memcpy ptr_data to GPU (%s:%s).",
-                        cudaGetErrorName(err), cudaGetErrorString(err));
-                log_message(msg);
-            }
-            break;
-        default:
-            assert(false);
-        }
-
-        if (ptr_data != NULL) {
-            char msg[1000];
-            snprintf(msg,1000,"Inject error at %p (GPU)", ptr_data);
-            log_message(msg);
-        }
-    }
-#endif
-}
-
-bool check_cpu_mem(ADDRVALUE* buffer,
-                   unsigned long long num_bytes,
-                   ADDRVALUE expected_value,
-                   ADDRVALUE new_value)
-{
-    const long unsigned num_words = num_bytes / sizeof(ADDRVALUE);
-    for (long unsigned word = 0; word < num_words; word++)
-    {
-        ADDRVALUE actual_value = buffer[word];
-        if (actual_value != expected_value)
-        {
-            log_error(&buffer[word], actual_value, expected_value);
-        }
-
-        buffer[word] = new_value;
-    }
-    return true;
-}
-
-bool check_gpu_mem(ADDRVALUE* buffer,
-                   unsigned long long num_bytes,
-                   ADDRVALUE expected_value,
-                   ADDRVALUE new_value)
-{
-#if defined(USE_CUDA)
-    check_gpu_stub(buffer, num_bytes, expected_value, new_value);
-#endif
-    return true;
-}
-
-void simple_memory_test()
-{
-	//
-	// Start the HW counters for the LocalMemErrors
-	//
-	int local_mem_errors = startLocalMemErrorsCounters();
-	if (!local_mem_errors)
-	{
-		char msg[] = "Cannot start LocalMemError counters.";
-		log_message(msg);
-		//ExitNow = 1;
-		if (daemon_pid_file_exists())
-		{
-			daemon_pid_delete_file();
-		}
-	}
-
-    ADDRVALUE expected_value = 0;
-
-	//
-	// The main loop
-	//
-	while(ExitNow == 0)
-	{
-        check_cpu_mem(cpu_mem, NumBytesCPU, expected_value, expected_value+1);
-        check_gpu_mem(gpu_mem, NumBytesGPU, expected_value, expected_value+1);
-
-        expected_value++;
-
-		local_mem_errors = readLocalMemErrorsCounters();
-		log_local_mem_errors(local_mem_errors);
-
-		if (SleepTime > 0 && ExitNow == 0)
-		{
-			sleep(SleepTime);
-		}
-	}
-
-	local_mem_errors = stopLocalMemErrorsCounters();
-	log_local_mem_errors(local_mem_errors);
-}
-
-void zero_one_test()
-{
-    //
-    // Start the HW counters for the LocalMemErrors
-    //
-    int local_mem_errors = startLocalMemErrorsCounters();
-    if (!local_mem_errors)
-    {
-        char msg[] = "Cannot start LocalMemError counters.";
-        log_message(msg);
-        //ExitNow = 1;
-        if (daemon_pid_file_exists())
-        {
-            daemon_pid_delete_file();
-        }
-    }
-
-    ADDRVALUE expected_value = 0x0;
-    //
-    // The main loop
-    //
-    while(ExitNow == 0)
-    {
-        //
-        // Simulate error at random position and random iteration.
-        //
-        inject_cpu_error(cpu_mem, expected_value, ZERO);
-        inject_gpu_error(gpu_mem, expected_value, ZERO);
-
-        check_cpu_mem(cpu_mem, NumBytesCPU, expected_value, ~expected_value);
-        check_gpu_mem(gpu_mem, NumBytesGPU, expected_value, ~expected_value);
-
-        expected_value = ~expected_value;
-
-        local_mem_errors = readLocalMemErrorsCounters();
-        log_local_mem_errors(local_mem_errors);
-
-        if (SleepTime > 0 && ExitNow == 0)
-        {
-            sleep(SleepTime);
-        }
-    }
-
-    local_mem_errors = stopLocalMemErrorsCounters();
-    log_local_mem_errors(local_mem_errors);
-}
-
-void random_pattern_test()
-{
-    //
-    // Start the HW counters for the LocalMemErrors
-    //
-    int local_mem_errors = startLocalMemErrorsCounters();
-    if (!local_mem_errors)
-    {
-        char msg[] = "Cannot start LocalMemError counters.";
-        log_message(msg);
-        //ExitNow = 1;
-        //if (daemon_pid_file_exists())
-        //{
-        //    daemon_pid_delete_file();
-        //}
-    }
-
-    ADDRVALUE expected_value;
-    memset(&expected_value, mem_pattern, sizeof(uint64_t));
-    if (CheckCPU)
-    {
-        memset(cpu_mem, mem_pattern, NumBytesCPU);
-    }
-#if defined(INJECT_ERR) && defined(USE_CUDA)
-    if (CheckGPU)
-    {
-        cudaError_t err = cudaMemset(gpu_mem, mem_pattern, NumBytesGPU);
-        if (err != cudaSuccess)
-        {
-            char msg[255];
-            sprintf(msg, "ERROR,Cannot memset ptr_data to 0x1 (%s:%s).",
-                         cudaGetErrorName(err), cudaGetErrorString(err));
-            log_message(msg);
-        }
-    }
-#endif
-
-    //
-    // The main loop
-    //
-    while (ExitNow == 0)
-    {
-        // 
-        // Simulate error at random position and random iteration.
-        //
-        if (CheckCPU)
-            inject_cpu_error(cpu_mem, expected_value, RANDOM);
-        if (CheckGPU)
-            inject_gpu_error(gpu_mem, expected_value, RANDOM);
-
-        if (CheckCPU)
-            check_cpu_mem(cpu_mem, NumBytesCPU, expected_value, ~expected_value);
-        if (CheckGPU)
-            check_gpu_mem(gpu_mem, NumBytesGPU, expected_value, ~expected_value);
-
-        expected_value = ~expected_value;
-
-        local_mem_errors = readLocalMemErrorsCounters();
-        log_local_mem_errors(local_mem_errors);
-
-        if (SleepTime > 0 && ExitNow == 0)
-        {
-            sleep(SleepTime);
-        }
-    }
-
-    local_mem_errors = stopLocalMemErrorsCounters();
-    log_local_mem_errors(local_mem_errors);
-}
-
-void memory_test_loop(Strategy_t type)
-{
-    switch (type) {
-    case SIMPLE:
-        simple_memory_test();
-        break;
-    case ZERO:
-        zero_one_test();
-        break;
-    case RANDOM:
-        random_pattern_test();
-        break;
-    default:
-        assert(false);
-    }
-}
-
-void check_no_daemon_running()
-{
-	pid_t pid = daemon_pid_read_from_file();
-	if (pid != 0)
-	{
-		fprintf(stderr, "It appears that an instance of this daemon is running because the %s pid file exists. If you are sure that there is no daemon running delete the pid file: %s.\n", PidFileName, PidFileName);
-		exit(EXIT_FAILURE);
-	}
-}
 
 bool is_initialized(void* ptr)
 {
     return ptr != NULL;
 }
 
+//! \internal [initialize_cpu_memory]
 void initialize_cpu_memory()
 {
     if (!is_initialized(cpu_mem))
@@ -350,7 +77,9 @@ void initialize_cpu_memory()
         memset(cpu_mem, 0x0, NumBytesCPU);
     }
 }
+//! \internal [initialize_cpu_memory]
 
+//! \internal [initialize_gpu_memory]
 void initialize_gpu_memory()
 {
 #ifdef USE_CUDA
@@ -385,12 +114,16 @@ void initialize_gpu_memory()
     }
 #endif
 }
+//! \internal [initialize_gpu_memory]
 
+//! \internal [free_cpu_memory]
 void free_cpu_memory()
 {
     free(cpu_mem);
 }
+//! \internal [free_cpu_memory]
 
+//! \internal [free_gpu_memory]
 void free_gpu_memory()
 {
 #ifdef USE_CUDA
@@ -412,75 +145,5 @@ void free_gpu_memory()
     }
 #endif
 }
-
-void sigterm_signal_handler(int signum)
-{
-	ExitNow = 1;
-	log_message("STOP,SIGTERM");
-}
-
-void sigint_signal_handler(int signum)
-{
-	ExitNow = 1;
-	log_message("STOP,SIGINT");
-}
-
-
-
-void daemon_pid_write_to_file(pid_t pid)
-{
-	FILE *f = fopen(PidFileName, "w+");
-	if (!f)
-	{
-		fprintf(stderr, "ERROR: Cannot create a daemon pid file.\n");
-		exit(EXIT_FAILURE);
-	}
-	fprintf(f, "%d", pid);
-	fclose(f);
-}
-
-unsigned char daemon_pid_file_exists()
-{
-	unsigned char is_file_exists = 0;
-
-	FILE *f = fopen(PidFileName, "w");
-	if (f)
-	{
-		is_file_exists = 1;
-		fclose(f);
-	}
-
-	return is_file_exists;
-}
-
-pid_t daemon_pid_read_from_file()
-{
-	pid_t pid = 0;
-	int fscanStatus = 0;
-	FILE *f = fopen(PidFileName, "r");
-	if (f)
-	{
-		int pid_int = 0;
-		fscanStatus = fscanf(f, "%d", &pid_int);
-		if (fscanStatus <= 0)
-		{
-		    fprintf(stderr, "ERROR: Cannot fscanf file %s for pid.\n", PidFileName);
-		}
-		pid = (pid_t)pid_int;
-		fclose(f);
-	}
-	return pid;
-
-}
-void daemon_pid_delete_file()
-{
-	int delete_status = remove(PidFileName);
-	if (delete_status != 0)
-	{
-		fprintf(stderr, "ERROR: Cannot delete the file %s. Probably no such file exists.\n", PidFileName);
-	}
-}
-
-
-
+//! \internal [free_gpu_memory]
 
