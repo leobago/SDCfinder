@@ -15,8 +15,12 @@ def analize(x):
     print(bits)
 
 
-def main():
-    size = 100500
+def get_gpu_mem_size(id_device=0):
+    return 100500
+
+
+def run():
+    size = get_gpu_mem_size()
     x = cupy.zeros(size, dtype=cupy.uint8)
     while True:
         time.sleep(interval_sleep)
@@ -26,6 +30,3 @@ def main():
         if checksum != 0:
             print("detected curruption", checksum)
             analize(x)
-
-if __name__ == "__main__":
-    main()
