@@ -10,7 +10,7 @@ from cupy.cuda import runtime
 interval_sleep = 120
 path_root_logs = "./"  # TODO: make this a parameter
 metadata = {}
-percent_memory_use = 0.5
+percent_memory_use = 0.6
 batch_size = 1024 * 1024
 
 
@@ -70,5 +70,7 @@ def run():
     x = cupy.zeros(size, dtype=cupy.uint8)
     # x[123] = 7
     while True:
+        with open(os.path.join(path_out, "pulse.log"), "a") as myfile:
+            print(datetime.datetime.now().isoformat(), file=myfile)
         time.sleep(interval_sleep)
         check_arrray(x, path_out)
