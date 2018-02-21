@@ -13,6 +13,7 @@ metadata = {}
 percent_memory_use = 0.1
 batch_size = 1024 * 1024
 
+
 def get_time_str():
     d = datetime.datetime.now()
     s = d.strftime("%y.%m.%d_%H.%M.%S")
@@ -49,6 +50,7 @@ def check_arrray(x):
         nonzero = check_batch(x[i * batch_size: i * batch_size + batch_size])
         if nonzero.shape[0] > 0:
             print("nonzero elements:", nonzero + i * batch_size)
+    x.fill(0)
 
 
 def get_gpu_mem_size(id_device=0):
@@ -64,7 +66,7 @@ def run():
     size = int(get_gpu_mem_size() * percent_memory_use)
     print("using {} B of memory".format(size))
     x = cupy.zeros(size, dtype=cupy.uint8)
+    x[123] = 7
     while True:
         time.sleep(interval_sleep)
         check_arrray(x)
-        x[123] = 7
