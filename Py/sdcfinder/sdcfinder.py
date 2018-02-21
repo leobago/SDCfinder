@@ -11,7 +11,7 @@ interval_sleep = 3
 path_root_logs = "./"  # TODO: make this a parameter
 metadata = {}
 percent_memory_use = 0.1
-
+batch_size = 1024 * 1024
 
 def get_time_str():
     d = datetime.datetime.now()
@@ -28,14 +28,27 @@ def save_data_json(data, name_file):
     f.close()
 
 
-def analize(x):
-    print("the following elements are nonzero")
-    idx_nonzero = cupy.nonzero(x)
-    nonzero = x[idx_nonzero]
-    nonzero_cpu = cupy.asnumpy(nonzero)
-    bits = np.unpackbits(nonzero_cpu)
-    print(idx_nonzero)
-    print(bits)
+def check_batch(batch):
+    idx_nonzero = cupy.nonzero(batch)[0]
+    # nonzero = batch[idx_nonzero]
+    # nonzero_cpu = cupy.asnumpy(nonzero)
+    # bits = np.unpackbits(nonzero_cpu)
+    return idx_nonzero
+    # print(bits)
+
+
+def check_arrray(x):
+    checksum = x.sum()
+    print("checksum:", checksum)
+    if checksum == 0:
+        return
+    print("detected {} currupted bytes".format(checksum))
+    print("the following bytes have changed")
+    cnt_batches = x.shape[0] // batch_size
+    for i in range(cnt_batches):
+        nonzero = check_batch(x[i * batch_size: i * batch_size + batch_size])
+        if nonzero.shape[0] > 0:
+            print("nonzero elements:", nonzero + i * batch_size)
 
 
 def get_gpu_mem_size(id_device=0):
@@ -53,9 +66,5 @@ def run():
     x = cupy.zeros(size, dtype=cupy.uint8)
     while True:
         time.sleep(interval_sleep)
-        checksum = x.sum()
-        print("checksum:", checksum)
-        x[1] = 7
-        if checksum != 0:
-            print("detected curruption", checksum)
-            analize(x)
+        check_arrray(x)
+        x[123] = 7
