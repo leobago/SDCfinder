@@ -5,11 +5,12 @@ import time
 import json
 import datetime
 from .sysinfo import get_sys_info
-
+from cupy.cuda import runtime
 
 interval_sleep = 3
-path_root_logs = "/work/alex/data/memcheck"  # TODO: make this a parameter
+path_root_logs = "./"  # TODO: make this a parameter
 metadata = {}
+percent_memory_use = 0.1
 
 
 def get_time_str():
@@ -38,7 +39,8 @@ def analize(x):
 
 
 def get_gpu_mem_size(id_device=0):
-    return 10050
+    mem_free, mem_total = runtime.memGetInfo()
+    return mem_free
 
 
 def run():
@@ -46,7 +48,8 @@ def run():
     metadata["platform"] = get_sys_info()
     print(metadata)
     save_data_json(metadata, os.path.join(path_out, "metadata.json"))
-    size = get_gpu_mem_size()
+    size = int(get_gpu_mem_size() * percent_memory_use)
+    print("using {} B of memory".format(size))
     x = cupy.zeros(size, dtype=cupy.uint8)
     while True:
         time.sleep(interval_sleep)
