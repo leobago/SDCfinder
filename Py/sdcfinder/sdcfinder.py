@@ -7,10 +7,10 @@ import datetime
 from .sysinfo import get_sys_info
 from cupy.cuda import runtime
 
-interval_sleep = 3
+interval_sleep = 12
 path_root_logs = "./"  # TODO: make this a parameter
 metadata = {}
-percent_memory_use = 0.1
+percent_memory_use = 0.5
 batch_size = 1024 * 1024
 
 
@@ -38,7 +38,7 @@ def check_batch(batch):
     # print(bits)
 
 
-def check_arrray(x):
+def check_arrray(x, path):
     checksum = x.sum()
     print("checksum:", checksum)
     if checksum == 0:
@@ -50,6 +50,8 @@ def check_arrray(x):
         nonzero = check_batch(x[i * batch_size: i * batch_size + batch_size])
         if nonzero.shape[0] > 0:
             print("nonzero elements:", nonzero + i * batch_size)
+            with open(os.path.join(path, "corruption.log"), "a") as myfile:
+                print("nonzero elements:", nonzero + i * batch_size, file=myfile)
     x.fill(0)
 
 
@@ -66,7 +68,7 @@ def run():
     size = int(get_gpu_mem_size() * percent_memory_use)
     print("using {} B of memory".format(size))
     x = cupy.zeros(size, dtype=cupy.uint8)
-    x[123] = 7
+    # x[123] = 7
     while True:
         time.sleep(interval_sleep)
-        check_arrray(x)
+        check_arrray(x, path_out)
