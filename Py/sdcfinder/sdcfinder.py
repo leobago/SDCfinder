@@ -7,7 +7,7 @@ import datetime
 from .sysinfo import get_sys_info
 from cupy.cuda import runtime
 
-interval_sleep = 12
+interval_sleep = 120
 path_root_logs = "./"  # TODO: make this a parameter
 metadata = {}
 percent_memory_use = 0.5
