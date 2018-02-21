@@ -63,6 +63,8 @@ def get_gpu_mem_size(id_device=0):
 def run():
     path_out = os.path.join(path_root_logs, get_time_str())
     metadata["platform"] = get_sys_info()
+    metadata["time_start"] = datetime.datetime.now().isoformat()
+    metadata["interval_sleep"] = interval_sleep
     print(metadata)
     save_data_json(metadata, os.path.join(path_out, "metadata.json"))
     size = int(get_gpu_mem_size() * percent_memory_use)
